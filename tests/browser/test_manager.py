@@ -3,11 +3,12 @@
 Tests for the BrowserManager.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, create_autospec
 
 import pytest
 
 from src.browser.manager import BrowserManager
+from playwright.async_api import Page
 from src.utils.config import BrowserConfig
 
 @pytest.fixture
@@ -25,6 +26,12 @@ async def test_browser_manager_start_stop(mock_async_playwright, mock_browser_co
     mock_playwright = AsyncMock()
     mock_browser = AsyncMock()
     mock_browser.is_connected = MagicMock(return_value=True)
+    
+    # Configure the mock browser to return a properly specced page mock.
+    # This prevents RuntimeWarning when PageController calls is_closed() on the page.
+    mock_page = create_autospec(Page, instance=True)
+    mock_page.is_closed.return_value = False
+    mock_browser.new_page.return_value = mock_page
     
     # When async_playwright() is called, it returns a context manager.
     # We mock the start() method to return the playwright object.
@@ -62,7 +69,10 @@ async def test_browser_manager_health_check(mock_browser_config):
     # Mock a healthy browser
     mock_browser = AsyncMock()
     mock_browser.is_connected = MagicMock(return_value=True)
-    mock_page = AsyncMock()
+    mock_page = create_autospec(Page, instance=True)
+    mock_page.is_closed.return_value = False
+    mock_page.close = AsyncMock()
+    
     mock_browser.new_page.return_value = mock_page
     manager.browser = mock_browser
     

@@ -4,19 +4,32 @@ Tests for the PageController.
 """
 
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, create_autospec
 
 import pytest
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from src.browser.page_controller import PageController
 
 @pytest.fixture
 def mock_page():
-    """Fixture for a mock Playwright page."""
-    page = AsyncMock()
+    """
+    Provides a precisely configured mock for a Playwright Page using create_autospec.
+    This ensures that the mock's API matches the real Page, preventing
+    errors from incorrect mock setups (e.g., awaiting a sync method like is_closed).
+    """
+    page = create_autospec(Page, instance=True)
     page.url = "about:blank"
+    
+    # is_closed is a synchronous method.
     page.is_closed.return_value = False
+    
+    # Async methods need to be awaitable.
+    page.goto = AsyncMock()
+    page.close = AsyncMock()
+    page.content = AsyncMock(return_value="<html></html>")
+    page.title = AsyncMock(return_value="Test Page")
+    
     return page
 
 @pytest.mark.asyncio

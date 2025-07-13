@@ -7,13 +7,14 @@ This module provides common fixtures and configuration for all tests.
 import asyncio
 import pytest
 from typing import AsyncGenerator, Generator
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, AsyncMock, patch, create_autospec
 
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 from src.api.app import create_app
 from src.utils.config import Config
+from src.browser.manager import BrowserManager
 from src.utils.logger import setup_logger
 
 
@@ -37,9 +38,17 @@ def test_config() -> Config:
 
 @pytest.fixture
 def mock_browser_manager():
-    """Create a mock browser manager."""
-    mock = AsyncMock()
+    """
+    Provides a precisely configured mock for the BrowserManager using create_autospec.
+    This ensures that the mock's API matches the real BrowserManager, preventing
+    errors from incorrect mock setups (e.g., awaiting a sync method).
+    """
+    mock = create_autospec(BrowserManager, instance=True)
+    
+    # is_running is a synchronous method.
     mock.is_running.return_value = True
+    
+    # Async methods need to be awaitable.
     mock.start = AsyncMock()
     mock.stop = AsyncMock()
     mock.health_check = AsyncMock(return_value=True)
