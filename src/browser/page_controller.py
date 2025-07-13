@@ -104,3 +104,99 @@ class PageController(LoggerMixin):
         if not self.page.is_closed():
             await self.page.close()
             self.logger.info("Page closed.")
+
+
+    async def is_logged_in(self, timeout: Optional[int] = 5000) -> bool:
+        """
+        Check if the user is logged in by looking for a specific element.
+
+        Args:
+            timeout: Optional timeout in milliseconds.
+
+        Returns:
+            True if the user is logged in, False otherwise.
+        """
+        self.log_method_call("is_logged_in")
+        # This selector should target an element that is only visible when logged in,
+        # for example, a user profile button or avatar.
+        # TODO: Replace with a more reliable selector for AI Studio.
+        login_indicator_selector = 'button[aria-label="Google Account"]'
+        
+        try:
+            await self.page.wait_for_selector(
+                login_indicator_selector, 
+                state="visible",
+                timeout=timeout
+            )
+            self.logger.info("Login indicator found, user is logged in.")
+            return True
+        except PlaywrightTimeoutError:
+            self.logger.warning("Login indicator not found, user is not logged in.")
+            return False
+
+
+    @async_retry(attempts=3)
+    async def switch_model(self, model_name: str) -> None:
+        """
+        Switch to a specified model in the AI Studio UI.
+
+        Args:
+            model_name: The name of the model to switch to (e.g., "Gemini 1.5 Pro").
+        
+        Raises:
+            ValueError: If the specified model is not found or cannot be selected.
+            PlaywrightTimeoutError: If a timeout occurs during the operation.
+        """
+        self.log_method_call("switch_model", model_name=model_name)
+        
+        model_menu_selector = 'button[aria-label="Model"]'
+        try:
+            await self.click(model_menu_selector)
+            self.logger.info("Model selection menu opened.")
+        except PlaywrightTimeoutError:
+            self.logger.error("Failed to open model selection menu.")
+            raise ValueError("Could not open model selection menu.")
+
+        model_element_selector = f'text="{model_name}"'
+        try:
+            await self.click(model_element_selector)
+            self.logger.info(f"Selected model: {model_name}")
+        except PlaywrightTimeoutError:
+            self.logger.error(f"Model '{model_name}' not found in the menu.")
+            raise ValueError(f"Model '{model_name}' not found.")
+
+        try:
+            await self.page.wait_for_selector(f'button[aria-label="Model"]:has-text("{model_name}")', state="visible")
+            self.logger.info(f"Successfully switched to model: {model_name}")
+        except PlaywrightTimeoutError:
+            self.logger.error(f"Failed to verify model switch to '{model_name}'.")
+            raise ValueError(f"Failed to switch to model '{model_name}'.")
+
+    async def send_message(self, message: str) -> None:
+        """
+        Sends a message to the AI Studio chat input.
+
+        Args:
+            message: The message to send.
+        
+        Raises:
+            ValueError: If the chat input or send button is not found.
+        """
+        self.log_method_call("send_message")
+        
+        chat_input_selector = 'div[aria-label="Chat input"]'
+        send_button_selector = 'button[aria-label="Send message"]'
+        
+        try:
+            await self.fill(chat_input_selector, message)
+            self.logger.info("Filled chat input with message.")
+        except PlaywrightTimeoutError:
+            self.logger.error("Failed to find chat input.")
+            raise ValueError("Chat input not found.")
+            
+        try:
+            await self.click(send_button_selector)
+            self.logger.info("Clicked send button.")
+        except PlaywrightTimeoutError:
+            self.logger.error("Failed to find send button.")
+            raise ValueError("Send button not found.")

@@ -5,6 +5,7 @@ This module defines the FastAPI routes for OpenAI-compatible endpoints.
 """
 
 import time
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -20,13 +21,17 @@ from .models import (
 from ..utils.logger import get_logger
 from ..utils.config import get_config
 from .. import __version__
+from ..core.handler import RequestHandler
+from ..browser.manager import BrowserManager
+from ..auth.manager import AuthManager
 
 logger = get_logger(__name__)
 router = APIRouter()
 
-# Global variables (will be properly initialized in main.py)
-request_handler = None
-browser_manager = None
+# Global variables will be replaced by dependencies injected via app state
+request_handler: Optional[RequestHandler] = None
+browser_manager: Optional[BrowserManager] = None
+auth_manager: Optional[AuthManager] = None
 start_time = time.time()
 
 # Metrics tracking
@@ -78,9 +83,8 @@ async def chat_completions(request: ChatCompletionRequest, http_request: Request
 
         # Process the request through the handler
         if request.stream:
-            response = await request_handler.handle_stream_request(request)
             return StreamingResponse(
-                response,
+                request_handler.handle_stream_request(request),
                 media_type="text/event-stream"
             )
         else:
@@ -141,13 +145,21 @@ async def health_check():
             browser_status = f"error: {str(e)}"
             logger.warning("Browser health check failed", error=str(e))
     
-    # Check auth status (placeholder)
-    auth_status = "not_implemented"
-    
+    # Check auth status
+    auth_status = "unknown"
+    if auth_manager:
+        try:
+            auth_healthy = await auth_manager.health_check()
+            auth_status = auth_manager.status.value if auth_manager.status else "unknown"
+            if not auth_healthy:
+                auth_status = f"unhealthy ({auth_status})"
+        except Exception as e:
+            auth_status = f"error: {str(e)}"
+            logger.warning("Auth health check failed", error=str(e))
+
     # Determine overall status
-    overall_status = "healthy"
-    if browser_status not in ["healthy", "unknown"]:
-        overall_status = "unhealthy"
+    is_healthy = browser_status == "healthy" and "unhealthy" not in auth_status
+    overall_status = "healthy" if is_healthy else "unhealthy"
     
     response = HealthResponse(
         status=overall_status,
@@ -176,8 +188,8 @@ async def get_metrics():
         if len(metrics["response_times"]) > 1000:
             metrics["response_times"] = metrics["response_times"][-1000:]
     
-    # Get browser sessions count (placeholder)
-    browser_sessions = 1 if browser_manager else 0
+    # Get browser sessions count
+    browser_sessions = 1 if browser_manager and browser_manager.is_running() else 0
     
     response = MetricsResponse(
         requests_total=metrics["requests_total"],
@@ -194,11 +206,13 @@ async def get_metrics():
     return response
 
 
-
-
-
-def set_dependencies(handler, browser):
+def set_dependencies(
+    handler: RequestHandler,
+    browser: BrowserManager,
+    auth: AuthManager,
+):
     """Set global dependencies for routes."""
-    global request_handler, browser_manager
+    global request_handler, browser_manager, auth_manager
     request_handler = handler
     browser_manager = browser
+    auth_manager = auth

@@ -15,6 +15,7 @@ from camoufox import Camoufox
 
 from ..utils.logger import LoggerMixin
 from ..utils.config import BrowserConfig
+from .page_controller import PageController
 
 
 class BrowserManager(LoggerMixin):
@@ -32,10 +33,11 @@ class BrowserManager(LoggerMixin):
         self.config = config
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
+        self.main_page_controller: Optional[PageController] = None
 
     async def start(self) -> None:
         """
-        Start the browser instance.
+        Start the browser instance and create a main page controller.
         """
         self.log_method_call("start")
         if self.browser and self.browser.is_connected():
@@ -44,19 +46,31 @@ class BrowserManager(LoggerMixin):
 
         self.playwright = await async_playwright().start()
         self.browser = await self.launch_browser()
-        self.logger.info("Browser started successfully.")
+        
+        # Create a main page to be used for background tasks like keep-alive
+        main_page = await self.browser.new_page()
+        self.main_page_controller = PageController(main_page)
+        
+        self.logger.info("Browser and main page controller started successfully.")
 
     async def stop(self) -> None:
         """
-        Stop the browser instance.
+        Stop the browser instance and clean up resources.
         """
         self.log_method_call("stop")
+        if self.main_page_controller:
+            await self.main_page_controller.close()
+            self.main_page_controller = None
+            self.logger.info("Main page controller closed.")
+            
         if self.browser and self.browser.is_connected():
             await self.browser.close()
             self.logger.info("Browser closed.")
+            
         if self.playwright:
             await self.playwright.stop()
             self.logger.info("Playwright stopped.")
+            
         self.browser = None
         self.playwright = None
 
@@ -67,6 +81,15 @@ class BrowserManager(LoggerMixin):
         self.log_method_call("restart")
         await self.stop()
         await self.start()
+
+    def is_running(self) -> bool:
+        """
+        Check if the browser instance is currently running.
+
+        Returns:
+            True if the browser is running and connected, False otherwise.
+        """
+        return self.browser is not None and self.browser.is_connected()
 
     async def health_check(self) -> bool:
         """
@@ -101,12 +124,12 @@ class BrowserManager(LoggerMixin):
             playwright_handle=self.playwright
         )
         
-        browser = await fox.launch(
-            headless=self.config.headless,
-            args=[
+        browser = await fox.launch(options={  # type: ignore
+            "headless": self.config.headless,
+            "args": [
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 f"--remote-debugging-port={self.config.port}",
             ],
-        )
+        })
         return browser

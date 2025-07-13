@@ -45,6 +45,7 @@ class AuthConfig(BaseSettings):
     profile_path: Optional[str] = Field(default=None, description="Browser profile path")
     auto_login: bool = Field(default=True, description="Enable automatic login")
     session_timeout: int = Field(default=3600, ge=300, description="Session timeout in seconds")
+    file_path: Optional[str] = Field(default=None, description="Path to the authentication file (e.g., cookies.json)")
     cookie_path: Optional[str] = Field(default=None, description="Cookie storage path")
 
     class Config:

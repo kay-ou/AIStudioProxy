@@ -62,9 +62,18 @@ def mock_request_handler():
     mock.health_check = AsyncMock(return_value=True)
     return mock
 
+@pytest.fixture
+def mock_auth_manager():
+    """Create a mock auth manager."""
+    mock = AsyncMock()
+    mock.login = AsyncMock(return_value=True)
+    mock.health_check = AsyncMock(return_value=True)
+    mock.status = Mock()
+    mock.status.value = "authenticated"
+    return mock
 
 @pytest.fixture
-def app_with_mocks(test_config, mock_browser_manager, mock_request_handler):
+def app_with_mocks(test_config, mock_browser_manager, mock_request_handler, mock_auth_manager):
     """Create FastAPI app with mocked dependencies."""
     # Patch the global config
     import src.utils.config
@@ -76,7 +85,11 @@ def app_with_mocks(test_config, mock_browser_manager, mock_request_handler):
     
     # Set mock dependencies
     from src.api.routes import set_dependencies
-    set_dependencies(mock_request_handler, mock_browser_manager)
+    set_dependencies(
+        handler=mock_request_handler,
+        browser=mock_browser_manager,
+        auth=mock_auth_manager,
+    )
     
     yield app
     

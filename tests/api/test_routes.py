@@ -64,11 +64,11 @@ async def test_chat_completions_streaming(async_client):
     """
     Test the streaming chat completion endpoint.
     """
-    async def mock_stream_response():
+    async def mock_stream_response(request):
         yield "data: hello\n\n"
         yield "data: world\n\n"
 
-    with patch("src.api.routes.request_handler.handle_stream_request", return_value=mock_stream_response()):
+    with patch("src.api.routes.request_handler.handle_stream_request", new=mock_stream_response):
         response = await async_client.post(
             "/v1/chat/completions",
             json={"model": "gemini-2.5-pro", "messages": [{"role": "user", "content": "hello"}], "stream": True}

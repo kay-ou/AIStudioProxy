@@ -20,20 +20,21 @@ from ..utils.config import get_config
 from .. import __version__
 from ..browser.manager import BrowserManager
 from ..core.handler import RequestHandler
+from ..auth.manager import AuthManager
+from ..services.keep_alive import KeepAliveService
 
 logger = get_logger(__name__)
 
-# Global variables for dependency injection
-browser_manager = None
-request_handler = None
-
+# It's better to use app.state for sharing objects across the application
+# instead of global variables.
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
     
-    Handles startup and shutdown events for the FastAPI application.
+    Handles startup and shutdown events for the FastAPI application, including
+    initializing and cleaning up the browser, authentication, and keep-alive services.
     """
     # Startup
     logger.info("Starting AIStudioProxy", version=__version__)
@@ -42,24 +43,51 @@ async def lifespan(app: FastAPI):
         # Initialize logging
         init_logging()
         
-        # Initialize browser manager
-        global browser_manager
-        browser_manager = BrowserManager(get_config().browser)
+        # Initialize managers and services
+        config = get_config()
+        browser_manager = BrowserManager(config.browser)
+        auth_manager = AuthManager(config.auth)
+        
+        # Store managers in app.state for access in other parts of the app
+        app.state.browser_manager = browser_manager
+        app.state.auth_manager = auth_manager
+        
+        # Start browser
         await browser_manager.start()
 
+        # Perform initial login
+        if config.auth.auto_login:
+            logger.info("Performing initial login...")
+            login_success = await auth_manager.login(browser_manager)
+            if not login_success:
+                logger.error("Initial login failed. The proxy may not function correctly.")
+                # Depending on requirements, you might want to exit here.
+                # For now, we'll log an error and continue.
+        
+        # Start keep-alive service
+        keep_alive_service = KeepAliveService(auth_manager, browser_manager)
+        app.state.keep_alive_service = keep_alive_service
+        await keep_alive_service.start()
+
         # Initialize request handler
-        global request_handler
         request_handler = RequestHandler(browser_manager=browser_manager)
         
         # Set dependencies for routes
-        set_dependencies(request_handler, browser_manager)
+        set_dependencies(
+            handler=request_handler,
+            browser=browser_manager,
+            auth=auth_manager,
+        )
         
         logger.info("AIStudioProxy startup completed")
         
         yield
         
     except Exception as e:
-        logger.error("Failed to start AIStudioProxy", error=str(e))
+        logger.error("Failed to start AIStudioProxy", error=str(e), exc_info=True)
+        # Ensure cleanup is attempted even if startup fails
+        if hasattr(app.state, 'browser_manager') and app.state.browser_manager:
+            await app.state.browser_manager.stop()
         raise
     
     finally:
@@ -67,14 +95,18 @@ async def lifespan(app: FastAPI):
         logger.info("Shutting down AIStudioProxy")
         
         try:
+            # Stop keep-alive service
+            if hasattr(app.state, 'keep_alive_service') and app.state.keep_alive_service:
+                await app.state.keep_alive_service.stop()
+
             # Cleanup browser manager
-            if browser_manager:
-                await browser_manager.stop()
+            if hasattr(app.state, 'browser_manager') and app.state.browser_manager:
+                await app.state.browser_manager.stop()
             
             logger.info("AIStudioProxy shutdown completed")
             
         except Exception as e:
-            logger.error("Error during shutdown", error=str(e))
+            logger.error("Error during shutdown", error=str(e), exc_info=True)
 
 
 def create_app() -> FastAPI:
@@ -129,6 +161,7 @@ def setup_exception_handlers(app: FastAPI):
                 error=ErrorDetail(
                     message=exc.detail,
                     type="http_error",
+                    param=None,
                     code=str(exc.status_code),
                 )
             ).dict()
@@ -149,6 +182,7 @@ def setup_exception_handlers(app: FastAPI):
                 error=ErrorDetail(
                     message="Request validation failed",
                     type="validation_error",
+                    param=None,
                     code="422",
                 )
             ).dict()
@@ -170,6 +204,7 @@ def setup_exception_handlers(app: FastAPI):
                 error=ErrorDetail(
                     message=exc.detail or "Internal server error",
                     type="server_error",
+                    param=None,
                     code=str(exc.status_code),
                 )
             ).dict()
@@ -192,6 +227,7 @@ def setup_exception_handlers(app: FastAPI):
                 error=ErrorDetail(
                     message="Internal server error",
                     type="internal_error",
+                    param=None,
                     code="500",
                 )
             ).dict()
