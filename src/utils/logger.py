@@ -140,11 +140,11 @@ def _parse_size(size_str: str) -> int:
     
     # Size multipliers
     multipliers = {
-        'B': 1,
-        'KB': 1024,
-        'MB': 1024 ** 2,
-        'GB': 1024 ** 3,
         'TB': 1024 ** 4,
+        'GB': 1024 ** 3,
+        'MB': 1024 ** 2,
+        'KB': 1024,
+        'B': 1,
     }
     
     # Extract number and unit
@@ -155,8 +155,9 @@ def _parse_size(size_str: str) -> int:
                 number = float(number_str)
                 return int(number * multiplier)
             except ValueError:
-                break
-    
+                # This will be caught by the final try-except
+                pass
+
     # Default to treating as bytes if parsing fails
     try:
         return int(size_str)

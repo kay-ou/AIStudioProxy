@@ -14,7 +14,7 @@ from typing import AsyncGenerator
 from ..api.models import (
     ChatCompletionRequest,
     ChatCompletionResponse,
-    Choice,
+    ChatCompletionChoice,
     Message,
     Usage,
     MessageRole,
@@ -196,7 +196,7 @@ class RequestHandler(LoggerMixin):
             created=int(time.time()),
             model=request.model,
             choices=[
-                Choice(
+                ChatCompletionChoice(
                     index=0,
                     message=Message(
                         role=MessageRole.ASSISTANT,

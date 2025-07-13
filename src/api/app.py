@@ -18,6 +18,8 @@ from .models import ErrorResponse, ErrorDetail
 from ..utils.logger import get_logger, init_logging
 from ..utils.config import get_config
 from .. import __version__
+from ..browser.manager import BrowserManager
+from ..core.handler import RequestHandler
 
 logger = get_logger(__name__)
 
@@ -40,17 +42,17 @@ async def lifespan(app: FastAPI):
         # Initialize logging
         init_logging()
         
-        # TODO: Initialize browser manager
-        # global browser_manager
-        # browser_manager = BrowserManager(get_config().browser)
-        # await browser_manager.start()
+        # Initialize browser manager
+        global browser_manager
+        browser_manager = BrowserManager(get_config().browser)
+        await browser_manager.start()
 
-        # Initialize request handler (without browser for now)
+        # Initialize request handler
         global request_handler
-        request_handler = RequestHandler(browser_manager=None)
+        request_handler = RequestHandler(browser_manager=browser_manager)
         
         # Set dependencies for routes
-        set_dependencies(request_handler, None)
+        set_dependencies(request_handler, browser_manager)
         
         logger.info("AIStudioProxy startup completed")
         
@@ -65,9 +67,9 @@ async def lifespan(app: FastAPI):
         logger.info("Shutting down AIStudioProxy")
         
         try:
-            # TODO: Cleanup browser manager
-            # if browser_manager:
-            #     await browser_manager.stop()
+            # Cleanup browser manager
+            if browser_manager:
+                await browser_manager.stop()
             
             logger.info("AIStudioProxy shutdown completed")
             
