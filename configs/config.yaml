@@ -1,0 +1,66 @@
+# AIStudioProxy Configuration File
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 2048
+  workers: 1
+  debug: false
+
+# Browser Configuration
+browser:
+  headless: true
+  port: 9222
+  timeout: 30000
+  user_agent: null
+  viewport_width: 1920
+  viewport_height: 1080
+
+# Authentication Configuration
+auth:
+  profile_path: null
+  auto_login: true
+  session_timeout: 3600
+  cookie_path: null
+
+# Logging Configuration
+log:
+  level: "INFO"
+  format: "json"
+  file_path: null
+  max_size: "10MB"
+  backup_count: 5
+
+# Performance Configuration
+performance:
+  max_concurrent_requests: 50
+  request_timeout: 60
+  retry_attempts: 3
+  retry_delay: 1.0
+
+# Security Configuration
+security:
+  api_key: null
+  rate_limit: 100
+  cors_origins: "*"
+  allowed_hosts: "*"
+
+# Monitoring Configuration
+monitoring:
+  enable_metrics: true
+  metrics_port: 9090
+  health_check_interval: 30
+
+# Development Configuration
+development:
+  reload: false
+  debug_browser: false
+  mock_responses: false
+
+# Supported Models
+supported_models:
+  - "gemini-2.5-pro"
+  - "gemini-2.5-flash"
+  - "gemini-1.5-pro"
+  - "gemini-1.5-flash"
+  - "gemini-1.0-pro"

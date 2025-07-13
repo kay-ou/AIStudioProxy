@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  aistudio-proxy-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: development
+    container_name: aistudio-proxy-dev
+    restart: unless-stopped
+    ports:
+      - "2048:2048"  # Main API port
+      - "9090:9090"  # Metrics port
+      - "8000:8000"  # Alternative dev port
+    environment:
+      # Server Configuration
+      - SERVER__HOST=0.0.0.0
+      - SERVER__PORT=2048
+      - SERVER__WORKERS=1
+      - SERVER__DEBUG=true
+      
+      # Browser Configuration
+      - BROWSER__HEADLESS=false  # Show browser for debugging
+      - BROWSER__PORT=9222
+      - BROWSER__TIMEOUT=30000
+      
+      # Logging Configuration
+      - LOG__LEVEL=DEBUG
+      - LOG__FORMAT=text  # More readable for development
+      - LOG__FILE_PATH=/app/logs/aistudio-proxy-dev.log
+      
+      # Development Configuration
+      - DEV__RELOAD=true
+      - DEV__DEBUG_BROWSER=true
+      - DEV__MOCK_RESPONSES=false
+      
+      # Performance Configuration (relaxed for dev)
+      - PERF__MAX_CONCURRENT_REQUESTS=10
+      - PERF__REQUEST_TIMEOUT=120
+      
+      # Security Configuration (relaxed for dev)
+      - SECURITY__RATE_LIMIT=1000
+      - SECURITY__CORS_ORIGINS=*
+    volumes:
+      # Source code mounting for hot reload
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./configs:/app/configs
+      - ./scripts:/app/scripts
+      
+      # Development data
+      - ./auth:/app/auth
+      - ./logs:/app/logs
+      - ./profiles:/app/profiles
+      
+      # Development tools
+      - dev-cache:/app/.pytest_cache
+      - dev-mypy:/app/.mypy_cache
+    networks:
+      - aistudio-dev-network
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "
+        echo 'Starting AIStudioProxy in development mode...' &&
+        python -m src.main --reload --debug --host 0.0.0.0 --port 2048
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2048/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Development database for testing
+  test-db:
+    image: postgres:15-alpine
+    container_name: aistudio-test-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=aistudio_test
+      - POSTGRES_USER=aistudio
+      - POSTGRES_PASSWORD=aistudio_dev
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+    networks:
+      - aistudio-dev-network
+    profiles:
+      - testing
+
+  # Redis for development caching
+  redis-dev:
+    image: redis:7-alpine
+    container_name: aistudio-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - aistudio-dev-network
+
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: aistudio-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    networks:
+      - aistudio-dev-network
+    profiles:
+      - testing
+
+networks:
+  aistudio-dev-network:
+    driver: bridge
+
+volumes:
+  dev-cache:
+  dev-mypy:
+  test-db-data:
+  redis-dev-data:
