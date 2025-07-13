@@ -3,6 +3,7 @@
 Tests for the PageController.
 """
 
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -168,3 +169,156 @@ async def test_send_message_button_not_found(mock_page):
         
     chat_input_selector = 'div[aria-label="Chat input"]'
     mock_page.fill.assert_awaited_once_with(chat_input_selector, message, timeout=controller.default_timeout)
+
+
+@pytest.mark.asyncio
+async def test_wait_for_response_success(mock_page):
+    """Test successful response waiting and text extraction."""
+    controller = PageController(mock_page)
+    expected_response = "This is the AI response."
+
+    # Mock the element and its inner_text method
+    mock_response_element = AsyncMock()
+    mock_response_element.inner_text.return_value = expected_response
+    
+    # When query_selector is called for the response block, return our mock element
+    mock_page.query_selector.return_value = mock_response_element
+
+    response = await controller.wait_for_response()
+
+    stop_generating_selector = 'button[aria-label="Stop generating"]'
+    response_selector = ".response-block:last-child"
+
+    # Check that we waited for the stop button to appear and then disappear
+    mock_page.wait_for_selector.assert_any_call(stop_generating_selector, state="visible", timeout=controller.default_timeout)
+    mock_page.wait_for_selector.assert_any_call(stop_generating_selector, state="hidden", timeout=controller.default_timeout)
+    
+    # Check that we queried for the response block
+    mock_page.query_selector.assert_awaited_once_with(response_selector)
+    
+    # Check that we got the text from the element
+    mock_response_element.inner_text.assert_awaited_once()
+    
+    assert response == expected_response
+
+@pytest.mark.asyncio
+async def test_wait_for_response_timeout_on_start(mock_page):
+    """Test timeout waiting for response generation to start."""
+    controller = PageController(mock_page)
+    
+    # Make the first wait_for_selector call (waiting for 'visible') time out
+    mock_page.wait_for_selector.side_effect = PlaywrightTimeoutError("Timeout waiting for start")
+
+    with pytest.raises(PlaywrightTimeoutError):
+        await controller.wait_for_response()
+
+@pytest.mark.asyncio
+async def test_wait_for_response_timeout_on_end(mock_page):
+    """Test timeout waiting for response generation to complete."""
+    controller = PageController(mock_page)
+
+    # First call for 'visible' succeeds, subsequent calls for 'hidden' fail.
+    mock_page.wait_for_selector.side_effect = [
+        None,
+        PlaywrightTimeoutError("Timeout waiting for end"),
+        PlaywrightTimeoutError("Timeout waiting for end"),
+        PlaywrightTimeoutError("Timeout waiting for end"),
+    ]
+
+    with pytest.raises(PlaywrightTimeoutError):
+        await controller.wait_for_response()
+
+@pytest.mark.asyncio
+async def test_wait_for_response_no_element_found(mock_page):
+    """Test that a ValueError is raised if the response element is not found."""
+    controller = PageController(mock_page)
+    
+    # Make query_selector return None
+    mock_page.query_selector.return_value = None
+
+    with pytest.raises(ValueError, match="Failed to extract response text."):
+        await controller.wait_for_response()
+
+
+@pytest.mark.asyncio
+async def test_start_streaming_response(mock_page):
+    """Test the start_streaming_response async generator."""
+    controller = PageController(mock_page)
+    
+    # Store the exposed functions so we can call them
+    exposed_functions = {}
+    async def mock_expose(name, func):
+        exposed_functions[name] = func
+    
+    mock_page.expose_function.side_effect = mock_expose
+    
+    # Mock the page interactions
+    mock_page.wait_for_selector.return_value = AsyncMock()
+    mock_page.evaluate.return_value = AsyncMock()
+    
+    # --- Test Execution ---
+    chunks = []
+    async def consume_stream():
+        nonlocal chunks
+        async for chunk in controller.start_streaming_response():
+            chunks.append(chunk)
+
+    # Run the consumer and the driver concurrently
+    consumer_task = asyncio.create_task(consume_stream())
+
+    # Give the consumer a moment to start and set up the observer
+    await asyncio.sleep(0.01)
+
+    # Simulate the JS code calling the exposed functions
+    await exposed_functions["onResponseChunk"]("data1")
+    await exposed_functions["onResponseChunk"]("data2")
+    await exposed_functions["onResponseDone"]() # Signal end of stream
+
+    # Wait for the consumer to finish
+    await consumer_task
+
+    # --- Assertions ---
+    # Verify that the correct functions were exposed
+    assert "onResponseChunk" in exposed_functions
+    assert "onResponseDone" in exposed_functions
+    
+    # Verify the page interactions
+    mock_page.wait_for_selector.assert_awaited_once_with(
+        'button[aria-label="Stop generating"]', state="visible", timeout=controller.default_timeout
+    )
+    mock_page.evaluate.assert_awaited_once()
+    
+    # Verify the received chunks
+    assert chunks == ["data1", "data2"]
+
+
+@pytest.mark.asyncio
+async def test_is_error_response_found(mock_page):
+    """Test that an error response is correctly identified."""
+    controller = PageController(mock_page)
+    error_message = "An error occurred."
+
+    # Mock the error element and its text
+    mock_error_element = AsyncMock()
+    mock_error_element.inner_text.return_value = error_message
+    
+    # Make query_selector return the mock element for the first error selector
+    mock_page.query_selector.return_value = mock_error_element
+
+    response = await controller.is_error_response()
+
+    assert response == error_message
+    mock_page.query_selector.assert_awaited_once_with('.response-block:last-child .error-message')
+
+@pytest.mark.asyncio
+async def test_is_error_response_not_found(mock_page):
+    """Test that no error is reported when no error element is found."""
+    controller = PageController(mock_page)
+    
+    # Make query_selector return None for all error selectors
+    mock_page.query_selector.return_value = None
+
+    response = await controller.is_error_response()
+
+    assert response is None
+    assert mock_page.query_selector.await_count == len(controller.error_selectors)

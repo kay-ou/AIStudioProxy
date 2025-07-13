@@ -7,7 +7,8 @@ managing interactions with the AI Studio page, including navigation,
 initialization, and basic operations.
 """
 
-from typing import Optional
+from typing import Optional, AsyncGenerator
+import asyncio
 
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
@@ -21,6 +22,11 @@ class PageController(LoggerMixin):
     """
 
     AISTUDIO_URL = "https://aistudio.google.com/"
+    error_selectors = [
+        ".error-message",
+        '[role="alert"]',
+        ".MuiAlert-message",  # A common selector for Material-UI alerts
+    ]
 
     def __init__(self, page: Page, default_timeout: int = 30000):
         """
@@ -81,19 +87,22 @@ class PageController(LoggerMixin):
             raise
 
     @async_retry()
-    async def wait_for_selector(self, selector: str, timeout: Optional[int] = None) -> None:
+    async def wait_for_selector(self, selector: str, timeout: Optional[int] = None, **kwargs) -> None:
         """
         Wait for an element to appear on the page.
 
         Args:
             selector: The CSS selector of the element to wait for.
             timeout: Optional timeout in milliseconds.
+            **kwargs: Additional arguments to pass to Playwright's wait_for_selector.
         """
-        self.log_method_call("wait_for_selector", selector=selector)
+        self.log_method_call("wait_for_selector", selector=selector, **kwargs)
         try:
-            await self.page.wait_for_selector(selector, timeout=timeout or self.default_timeout)
+            await self.page.wait_for_selector(
+                selector, timeout=timeout or self.default_timeout, **kwargs
+            )
         except PlaywrightTimeoutError:
-            self.logger.error("Timeout while waiting for selector", selector=selector)
+            self.logger.error("Timeout while waiting for selector", selector=selector, **kwargs)
             raise
 
     async def close(self) -> None:
@@ -200,3 +209,201 @@ class PageController(LoggerMixin):
         except PlaywrightTimeoutError:
             self.logger.error("Failed to find send button.")
             raise ValueError("Send button not found.")
+
+
+    async def wait_for_response(self) -> str:
+        """
+        Waits for the AI response to be generated and returns the full response text.
+
+        This method first waits for the "Stop generating" button to appear,
+        indicating that the response generation has started. Then, it waits
+        for that same button to disappear, indicating the response is complete.
+        Finally, it extracts the text from the last response block.
+
+        Returns:
+            The full text of the AI's response.
+
+        Raises:
+            PlaywrightTimeoutError: If the response start or end indicators
+                                    do not appear/disappear within the timeout.
+            ValueError: If the response content cannot be found after generation.
+        """
+        self.log_method_call("wait_for_response")
+
+        stop_generating_selector = 'button[aria-label="Stop generating"]'
+        
+        self.logger.info("Waiting for response generation to start...")
+        await self.wait_for_selector(
+            stop_generating_selector,
+            state="visible"
+        )
+        self.logger.info("Response generation started.")
+
+        self.logger.info("Waiting for response generation to complete...")
+        await self.wait_for_selector(
+            stop_generating_selector,
+            state="hidden"
+        )
+        self.logger.info("Response generation completed.")
+
+        # After the response is complete, we need to get the content.
+        # The responses are in a div with class "response-block". We want the last one.
+        response_selector = ".response-block:last-child"
+        
+        try:
+            response_element = await self.page.query_selector(response_selector)
+            if not response_element:
+                self.logger.error("Could not find response block element.")
+                raise ValueError("Response block not found.")
+            
+            response_text = await response_element.inner_text()
+            self.logger.info("Extracted response text.", response_length=len(response_text))
+            return response_text
+        except Exception as e:
+            self.logger.error("Failed to extract response text.", error=e)
+            raise ValueError("Failed to extract response text.")
+
+
+    async def start_streaming_response(self) -> AsyncGenerator[str, None]:
+        """
+        Starts listening for a streaming response and yields text chunks.
+
+        This method sets up a MutationObserver to detect changes in the response
+        area and yields new text chunks as they appear. It also monitors for
+        the end of the response.
+
+        Yields:
+            str: A chunk of the response text.
+        
+        Raises:
+            asyncio.TimeoutError: If the response generation does not start or
+                                  end within the expected timeout.
+        """
+        self.log_method_call("start_streaming_response")
+        queue = asyncio.Queue()
+
+        async def on_response_chunk(chunk: str):
+            await queue.put(chunk)
+
+        async def on_response_done():
+            await queue.put(None)  # Signal for end of stream
+
+        await self.page.expose_function("onResponseChunk", on_response_chunk)
+        await self.page.expose_function("onResponseDone", on_response_done)
+
+        response_container_selector = ".chat-history"
+        stop_generating_selector = 'button[aria-label="Stop generating"]'
+
+        js_code = """
+        () => {
+            const targetNode = document.querySelector('""" + response_container_selector + """');
+            if (!targetNode) {
+                console.error('Response container not found');
+                window.onResponseDone();
+                return;
+            }
+
+            let lastResponseBlock = null;
+            let lastText = '';
+
+            const responseObserver = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.nodeType === 1 && node.classList.contains('response-block')) {
+                                lastResponseBlock = node;
+                                observeResponseBlock(lastResponseBlock);
+                            }
+                        });
+                    }
+                }
+            });
+
+            const observeResponseBlock = (responseBlock) => {
+                const blockObserver = new MutationObserver(() => {
+                    const newText = responseBlock.innerText;
+                    if (newText !== lastText) {
+                        const chunk = newText.substring(lastText.length);
+                        lastText = newText;
+                        window.onResponseChunk(chunk);
+                    }
+                });
+                blockObserver.observe(responseBlock, { childList: true, characterData: true, subtree: true });
+            };
+
+            responseObserver.observe(targetNode, { childList: true });
+
+            // Handle completion
+            const stopButton = document.querySelector('""" + stop_generating_selector + """');
+            if (stopButton) {
+                const doneObserver = new MutationObserver(() => {
+                    if (!document.querySelector('""" + stop_generating_selector + """')) {
+                        doneObserver.disconnect();
+                        // Final check for any remaining text
+                        if (lastResponseBlock) {
+                           const finalText = lastResponseBlock.innerText;
+                           if (finalText.length > lastText.length) {
+                               window.onResponseChunk(finalText.substring(lastText.length));
+                           }
+                        }
+                        window.onResponseDone();
+                    }
+                });
+                doneObserver.observe(document.body, { childList: true, subtree: true });
+            } else {
+                // If stop button never appears, we might be in an error state or done already
+                window.onResponseDone();
+            }
+        }
+        """
+        
+        # Wait for generation to start
+        self.logger.info("Waiting for response generation to start...")
+        await self.wait_for_selector(stop_generating_selector, state="visible")
+        self.logger.info("Response generation started.")
+
+        await self.page.evaluate(js_code)
+        self.logger.info("MutationObserver for streaming response started.")
+
+        while True:
+            try:
+                # Wait for a new chunk with a timeout
+                chunk = await asyncio.wait_for(queue.get(), timeout=self.default_timeout / 1000)
+                if chunk is None:
+                    self.logger.info("End of stream signal received.")
+                    break
+                yield chunk
+            except asyncio.TimeoutError:
+                self.logger.error("Timeout waiting for next stream chunk.")
+                # Check if the stop button is gone, which means we are done
+                if not await self.page.query_selector(stop_generating_selector):
+                    self.logger.info("Stop button disappeared, assuming stream is complete.")
+                    break
+                else:
+                    raise # Re-raise if we timed out but generation is supposedly still active
+
+
+    async def is_error_response(self) -> Optional[str]:
+        """
+        Checks if the latest response is an error message.
+
+        Returns:
+            The error message text if an error is found, otherwise None.
+        """
+        self.log_method_call("is_error_response")
+        
+        for selector in self.error_selectors:
+            try:
+                error_element = await self.page.query_selector(f".response-block:last-child {selector}")
+                if error_element:
+                    error_text = await error_element.inner_text()
+                    self.logger.warning("Error response detected.", selector=selector, error_text=error_text)
+                    return error_text
+            except Exception as e:
+                self.logger.debug(
+                    "Could not check for error selector, it might not exist.",
+                    selector=selector,
+                    error=str(e)
+                )
+        
+        return None
