@@ -135,4 +135,4 @@ RUN apt-get update && apt-get install -y \
 USER aistudio
 
 # Override command for development
-CMD ["python", "-m", "src.main", "--reload", "--debug"]
+CMD ["python", "-m", "aistudioproxy.main", "--reload", "--debug"]

@@ -7,8 +7,8 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
-from src.api.security import get_api_key, API_KEY_NAME
-from src.utils.config import Config, APIConfig
+from aistudioproxy.api.security import get_api_key, API_KEY_NAME
+from aistudioproxy.utils.config import Config, APIConfig
 
 # Create a test FastAPI app
 app = FastAPI()
@@ -28,7 +28,7 @@ def mock_config():
     """Fixture to mock the application configuration."""
     mock_api_config = APIConfig(keys=[VALID_KEY])
     mock_app_config = Config(api=mock_api_config)
-    with patch('src.api.security.get_config', return_value=mock_app_config):
+    with patch('aistudioproxy.api.security.get_config', return_value=mock_app_config):
         yield
 
 def test_get_api_key_valid(mock_config):
@@ -74,7 +74,7 @@ def test_get_api_key_empty_key_list(mock_config):
     # Override the mock for this specific test
     mock_api_config = APIConfig(keys=[])
     mock_app_config = Config(api=mock_api_config)
-    with patch('src.api.security.get_config', return_value=mock_app_config):
+    with patch('aistudioproxy.api.security.get_config', return_value=mock_app_config):
         headers = {API_KEY_NAME: f"Bearer {VALID_KEY}"}
         response = client.get("/secure", headers=headers)
         assert response.status_code == 403

@@ -12,10 +12,10 @@ from unittest.mock import Mock, AsyncMock, patch, create_autospec
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
-from src.api.app import create_app
-from src.utils.config import Config
-from src.browser.manager import BrowserManager
-from src.utils.logger import setup_logger
+from aistudioproxy.api.app import create_app
+from aistudioproxy.utils.config import Config
+from aistudioproxy.browser.manager import BrowserManager
+from aistudioproxy.utils.logger import setup_logger
 
 
 @pytest.fixture
@@ -87,14 +87,14 @@ def app_with_mocks(test_config, mock_browser_manager, mock_request_handler, mock
     # Patch get_config where it's imported to ensure all parts of the app
     # use the test configuration. This is crucial for dependencies like API key
     # security that resolve on module import.
-    with patch('src.api.app.get_config', return_value=test_config), \
-         patch('src.api.routes.get_config', return_value=test_config), \
-         patch('src.api.security.get_config', return_value=test_config):
+    with patch('aistudioproxy.api.app.get_config', return_value=test_config), \
+         patch('aistudioproxy.api.routes.get_config', return_value=test_config), \
+         patch('aistudioproxy.api.security.get_config', return_value=test_config):
         
         app = create_app()
         
         # Set mock dependencies for handlers
-        from src.api.routes import set_dependencies
+        from aistudioproxy.api.routes import set_dependencies
         set_dependencies(
             handler=mock_request_handler,
             browser=mock_browser_manager,

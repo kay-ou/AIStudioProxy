@@ -109,7 +109,7 @@ start_local() {
     
     # Start the application
     print_status "Starting application..."
-    poetry run python -m src.main --reload --debug
+    poetry run python -m aistudioproxy.main --reload --debug
 }
 
 # Function to run tests

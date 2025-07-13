@@ -63,7 +63,7 @@ services:
     command: >
       bash -c "
         echo 'Starting AIStudioProxy in development mode...' &&
-        python -m src.main --reload --debug --host 0.0.0.0 --port 2048
+        python -m aistudioproxy.main --reload --debug --host 0.0.0.0 --port 2048
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:2048/health"]

@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from src.utils.config import Config, get_config, load_config_from_file, ServerConfig, BrowserConfig
+from aistudioproxy.utils.config import Config, get_config, load_config_from_file, ServerConfig, BrowserConfig
 
 @pytest.fixture
 def sample_config_dict():

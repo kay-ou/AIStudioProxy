@@ -8,8 +8,8 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.utils.logger import setup_logger, _parse_size
-from src.utils.config import LogConfig
+from aistudioproxy.utils.logger import setup_logger, _parse_size
+from aistudioproxy.utils.config import LogConfig
 
 @pytest.fixture
 def mock_log_config():
@@ -18,7 +18,7 @@ def mock_log_config():
 
 def test_setup_logger(mock_log_config):
     """Test that the logger is set up correctly."""
-    with patch("src.utils.logger.logging.getLogger") as mock_get_logger:
+    with patch("aistudioproxy.utils.logger.logging.getLogger") as mock_get_logger:
         logger = setup_logger(mock_log_config)
         assert logger is not None
         mock_get_logger.assert_called()
@@ -36,8 +36,8 @@ def test_logger_with_file_output(tmp_path, mock_log_config):
     log_file = tmp_path / "test.log"
     mock_log_config.file_path = str(log_file)
     
-    with patch("src.utils.logger.logging.handlers.RotatingFileHandler") as mock_handler, \
-         patch("src.utils.logger.logging.getLogger") as mock_get_logger:
+    with patch("aistudioproxy.utils.logger.logging.handlers.RotatingFileHandler") as mock_handler, \
+         patch("aistudioproxy.utils.logger.logging.getLogger") as mock_get_logger:
         
         # Mock the logger and its handlers to prevent conflicts with pytest's logging capture
         mock_logger = MagicMock()

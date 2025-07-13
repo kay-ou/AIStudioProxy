@@ -109,7 +109,7 @@ def main():
         
         # Start the server
         uvicorn.run(
-            "src.api.app:app",
+            "aistudioproxy.api.app:app",
             host=config.server.host,
             port=config.server.port,
             workers=config.server.workers if not config.development.reload else 1,

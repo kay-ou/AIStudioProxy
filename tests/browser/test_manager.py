@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch, create_autospec
 
 import pytest
 
-from src.browser.manager import BrowserManager
+from aistudioproxy.browser.manager import BrowserManager
 from playwright.async_api import Page
-from src.utils.config import BrowserConfig
+from aistudioproxy.utils.config import BrowserConfig
 
 @pytest.fixture
 def mock_browser_config():
@@ -17,7 +17,7 @@ def mock_browser_config():
     return BrowserConfig(headless=True, port=9222)
 
 @pytest.mark.asyncio
-@patch("src.browser.manager.async_playwright")
+@patch("aistudioproxy.browser.manager.async_playwright")
 async def test_browser_manager_start_stop(mock_async_playwright, mock_browser_config):
     """
     Test the start and stop methods of the BrowserManager.

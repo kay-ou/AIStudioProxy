@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, create_autospec
 import pytest
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
-from src.browser.page_controller import PageController
+from aistudioproxy.browser.page_controller import PageController
 
 @pytest.fixture
 def mock_page():

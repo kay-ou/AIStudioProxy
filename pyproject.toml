@@ -63,7 +63,7 @@ Documentation = "https://github.com/kay-ou/AIStudioProxy/docs"
 Issues = "https://github.com/kay-ou/AIStudioProxy/issues"
 
 [project.scripts]
-aistudio-proxy = "src.main:main"
+aistudio-proxy = "aistudioproxy.main:main"
 
 # Poetry配置 (如果使用Poetry)
 [tool.poetry]
@@ -100,7 +100,7 @@ pre-commit = "^3.6.0"
 pytest-mock = "^3.14.1"
 
 [tool.poetry.scripts]
-aistudio-proxy = "src.main:main"
+aistudio-proxy = "aistudioproxy.main:main"
 
 # 代码质量工具配置
 [tool.black]

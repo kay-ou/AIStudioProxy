@@ -57,7 +57,7 @@
 **验收标准**:
 ```bash
 # 项目可以启动
-poetry run python -m src.main
+poetry run python -m aistudioproxy.main
 
 # 健康检查通过
 curl http://localhost:2048/health
@@ -400,7 +400,7 @@ poetry run mypy src/
 poetry run pytest
 
 # 启动开发服务器
-poetry run python -m src.main
+poetry run python -m aistudioproxy.main
 ```
 
 ## 📝 注意事项

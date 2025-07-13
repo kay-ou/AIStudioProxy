@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import status
 
-from src.api.models import HealthResponse, ModelListResponse
+from aistudioproxy.api.models import HealthResponse, ModelListResponse
 
 @pytest.mark.asyncio
 async def test_health_check(async_client):
     """Test the health check endpoint."""
-    with patch("src.api.routes.browser_manager", new_callable=AsyncMock) as mock_browser_manager:
+    with patch("aistudioproxy.api.routes.browser_manager", new_callable=AsyncMock) as mock_browser_manager:
         mock_browser_manager.health_check.return_value = True
         
         response = await async_client.get("/health")
@@ -53,7 +53,7 @@ async def test_chat_completions_no_handler(async_client):
     """
     Test that a 503 error is returned when the request handler is not available.
     """
-    with patch("src.api.routes.request_handler", None):
+    with patch("aistudioproxy.api.routes.request_handler", None):
         response = await async_client.post(
             "/v1/chat/completions",
             json={"model": "gemini-2.5-pro", "messages": [{"role": "user", "content": "hello"}]},
@@ -70,7 +70,7 @@ async def test_chat_completions_streaming(async_client):
         yield "data: hello\n\n"
         yield "data: world\n\n"
 
-    with patch("src.api.routes.request_handler.handle_stream_request", new=mock_stream_response):
+    with patch("aistudioproxy.api.routes.request_handler.handle_stream_request", new=mock_stream_response):
         response = await async_client.post(
             "/v1/chat/completions",
             json={"model": "gemini-2.5-pro", "messages": [{"role": "user", "content": "hello"}], "stream": True},
@@ -89,7 +89,7 @@ async def test_health_check_no_browser_manager(async_client):
     """
     Test the health check endpoint when the browser manager is not available.
     """
-    with patch("src.api.routes.browser_manager", None):
+    with patch("aistudioproxy.api.routes.browser_manager", None):
         response = await async_client.get("/health")
         assert response.status_code == 200
         json_response = response.json()
@@ -100,7 +100,7 @@ async def test_health_check_browser_error(async_client):
     """
     Test the health check endpoint when the browser health check fails.
     """
-    with patch("src.api.routes.browser_manager.health_check", side_effect=Exception("health check failed")):
+    with patch("aistudioproxy.api.routes.browser_manager.health_check", side_effect=Exception("health check failed")):
         response = await async_client.get("/health")
         assert response.status_code == 200
         json_response = response.json()

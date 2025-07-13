@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.utils.retry import async_retry
+from aistudioproxy.utils.retry import async_retry
 
 @pytest.mark.asyncio
 async def test_async_retry_success_on_first_attempt():
@@ -24,7 +24,7 @@ async def test_async_retry_success_on_first_attempt():
     mock_func.assert_awaited_once()
 
 @pytest.mark.asyncio
-@patch('src.utils.retry.logger')
+@patch('aistudioproxy.utils.retry.logger')
 async def test_async_retry_success_after_failures(mock_logger):
     """
     Test that the decorator succeeds after a few failed attempts.
@@ -38,7 +38,7 @@ async def test_async_retry_success_after_failures(mock_logger):
     assert mock_func.call_count == 3
 
 @pytest.mark.asyncio
-@patch('src.utils.retry.logger')
+@patch('aistudioproxy.utils.retry.logger')
 async def test_async_retry_fails_after_max_attempts(mock_logger):
     """
     Test that the decorator raises the last exception after all attempts fail.
@@ -54,7 +54,7 @@ async def test_async_retry_fails_after_max_attempts(mock_logger):
 
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
-@patch('src.utils.retry.logger')
+@patch('aistudioproxy.utils.retry.logger')
 async def test_async_retry_uses_exponential_backoff(mock_logger, mock_sleep):
     """
     Test that the decorator uses exponential backoff for delays.

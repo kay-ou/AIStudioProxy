@@ -317,8 +317,8 @@ class PageController:
 ### 4. API路由 (src/api/routes.py)
 ```python
 from fastapi import APIRouter, HTTPException
-from src.api.models import ChatCompletionRequest, ChatCompletionResponse
-from src.core.handler import RequestHandler
+from aistudioproxy.api.models import ChatCompletionRequest, ChatCompletionResponse
+from aistudioproxy.core.handler import RequestHandler
 
 router = APIRouter()
 handler = RequestHandler()
@@ -366,10 +366,10 @@ import asyncio
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from src.api.routes import router
-from src.browser.manager import BrowserManager
-from src.utils.config import config
-from src.utils.logger import setup_logger
+from aistudioproxy.api.routes import router
+from aistudioproxy.browser.manager import BrowserManager
+from aistudioproxy.utils.config import config
+from aistudioproxy.utils.logger import setup_logger
 
 # 全局浏览器管理器
 browser_manager = None
@@ -404,7 +404,7 @@ app.include_router(router)
 def main():
     """主函数"""
     uvicorn.run(
-        "src.main:app",
+        "aistudioproxy.main:app",
         host=config.server.host,
         port=config.server.port,
         workers=config.server.workers,
@@ -431,7 +431,7 @@ if __name__ == "__main__":
 **验收标准**:
 ```bash
 # 项目可以启动
-python -m src.main
+python -m aistudioproxy.main
 
 # 健康检查通过
 curl http://localhost:2048/health
@@ -814,7 +814,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:2048/health || exit 1
 
 # 启动命令
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "aistudioproxy.main"]
 ```
 
 #### 2. docker-compose.yml
@@ -906,10 +906,10 @@ vim .env
 ### 3. 启动服务
 ```bash
 # 开发模式
-python -m src.main
+python -m aistudioproxy.main
 
 # 生产模式
-uvicorn src.main:app --host 0.0.0.0 --port 2048
+uvicorn aistudioproxy.main:app --host 0.0.0.0 --port 2048
 
 # Docker方式
 docker-compose up -d

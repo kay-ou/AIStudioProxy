@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch, create_autospec
 
 from fastapi import HTTPException
 
-from src.browser.manager import BrowserManager
-from src.core.handler import RequestHandler
-from src.api.models import ChatCompletionRequest, Message, MessageRole, ChatCompletionResponse, Usage
+from aistudioproxy.browser.manager import BrowserManager
+from aistudioproxy.core.handler import RequestHandler
+from aistudioproxy.api.models import ChatCompletionRequest, Message, MessageRole, ChatCompletionResponse, Usage
 
 @pytest.fixture
 def mock_browser_manager():
@@ -33,7 +33,7 @@ def mock_browser_manager():
     
     return mock
 
-from src.browser.page_controller import PageController
+from aistudioproxy.browser.page_controller import PageController
 
 @pytest.fixture
 def mock_page_controller():
@@ -58,9 +58,9 @@ async def request_handler(mock_browser_manager, mock_page_controller):
     mock_config.performance.max_concurrent_requests = 10
     mock_config.performance.cleanup_delay = 0
     
-    with patch('src.core.handler.get_config', return_value=mock_config), \
-         patch('src.utils.logger.LoggerMixin.logger', new_callable=MagicMock), \
-         patch('src.core.handler.PageController', return_value=mock_page_controller):
+    with patch('aistudioproxy.core.handler.get_config', return_value=mock_config), \
+         patch('aistudioproxy.utils.logger.LoggerMixin.logger', new_callable=MagicMock), \
+         patch('aistudioproxy.core.handler.PageController', return_value=mock_page_controller):
         handler = RequestHandler(browser_manager=mock_browser_manager)
         yield handler
         # Teardown logic is no longer needed here as we are not running real tasks
@@ -86,7 +86,7 @@ def sample_request():
 @pytest.mark.asyncio
 async def test_handle_request_success(request_handler, sample_request, mock_page_controller):
     """Test successful handling of a non-streaming request with browser automation."""
-    with patch('src.core.handler.format_non_streaming_response') as mock_format_response, \
+    with patch('aistudioproxy.core.handler.format_non_streaming_response') as mock_format_response, \
          patch.object(request_handler, '_cleanup_request', new_callable=AsyncMock) as mock_cleanup:
 
         mock_response_obj = ChatCompletionResponse(
@@ -228,7 +228,7 @@ async def test_health_check(request_handler, mock_browser_manager):
 async def test_request_tracking_and_cleanup(request_handler, sample_request, mock_page_controller):
     """Test request tracking, stats, and cleanup."""
     assert request_handler.get_active_requests_count() == 0
-    with patch('src.core.handler.format_non_streaming_response') as mock_format_response:
+    with patch('aistudioproxy.core.handler.format_non_streaming_response') as mock_format_response:
         
         mock_format_response.return_value = ChatCompletionResponse(
             id="response-123", created=12345, model=sample_request.model, choices=[],

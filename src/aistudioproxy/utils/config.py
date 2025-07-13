@@ -41,6 +41,7 @@ class BrowserConfig(BaseSettings):
 class AuthConfig(BaseSettings):
     """Authentication configuration settings."""
 
+    enabled: bool = Field(default=True, description="Enable authentication")
     profile_path: Optional[str] = Field(default=None, description="Browser profile path")
     auto_login: bool = Field(default=True, description="Enable automatic login")
     session_timeout: int = Field(default=3600, ge=300, description="Session timeout in seconds")

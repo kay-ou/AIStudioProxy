@@ -1,13 +1,13 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.main import main
-from src.api.app import app
+from aistudioproxy.main import main
+from aistudioproxy.api.app import app
 
 @patch('uvicorn.run')
-@patch('src.main.get_config')
-@patch('src.main.init_logging')
-@patch('src.main.setup_signal_handlers')
+@patch('aistudioproxy.main.get_config')
+@patch('aistudioproxy.main.init_logging')
+@patch('aistudioproxy.main.setup_signal_handlers')
 @patch('argparse.ArgumentParser')
 def test_main(mock_arg_parser, mock_setup_signals, mock_init_logging, mock_get_config, mock_run):
     """Test the main function."""
@@ -38,7 +38,7 @@ def test_main(mock_arg_parser, mock_setup_signals, mock_init_logging, mock_get_c
     assert mock_config.server.debug is True
 
     mock_run.assert_called_once_with(
-        "src.api.app:app",
+        "aistudioproxy.api.app:app",
         host="127.0.0.1",
         port=8000,
         workers=1,  # Workers should be 1 when reload is True
