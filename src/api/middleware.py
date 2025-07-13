@@ -84,29 +84,6 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     """Middleware for security headers and basic protection."""
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Check API key if configured
-        config = get_config()
-        if config.security.api_key:
-            api_key = request.headers.get("Authorization")
-            if not api_key or not api_key.startswith("Bearer "):
-                logger.warning(
-                    "Missing or invalid API key",
-                    client_ip=request.client.host if request.client else None,
-                    url=str(request.url),
-                )
-                from fastapi import HTTPException
-                raise HTTPException(status_code=401, detail="Invalid API key")
-            
-            provided_key = api_key[7:]  # Remove "Bearer " prefix
-            if provided_key != config.security.api_key:
-                logger.warning(
-                    "Invalid API key provided",
-                    client_ip=request.client.host if request.client else None,
-                    url=str(request.url),
-                )
-                from fastapi import HTTPException
-                raise HTTPException(status_code=401, detail="Invalid API key")
-        
         # Process request
         response = await call_next(request)
         

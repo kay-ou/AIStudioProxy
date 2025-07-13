@@ -16,6 +16,7 @@ def mock_page():
     """Fixture for a mock Playwright page."""
     page = AsyncMock()
     page.url = "about:blank"
+    page.is_closed.return_value = False
     return page
 
 @pytest.mark.asyncio

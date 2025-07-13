@@ -7,22 +7,14 @@ This module provides common fixtures and configuration for all tests.
 import asyncio
 import pytest
 from typing import AsyncGenerator, Generator
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 from src.api.app import create_app
-from src.utils.config import Config, get_config
+from src.utils.config import Config
 from src.utils.logger import setup_logger
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create an event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture
@@ -38,6 +30,7 @@ def test_config() -> Config:
     config.browser.timeout = 5000
     config.log.level = "DEBUG"
     config.development.mock_responses = True
+    config.api.keys = ["test-key"]
     
     return config
 
@@ -46,10 +39,17 @@ def test_config() -> Config:
 def mock_browser_manager():
     """Create a mock browser manager."""
     mock = AsyncMock()
+    mock.is_running.return_value = True
     mock.start = AsyncMock()
     mock.stop = AsyncMock()
     mock.health_check = AsyncMock(return_value=True)
-    mock.page = Mock()
+    
+    # Mock the page pool methods
+    mock_page = AsyncMock()
+    mock.get_page = AsyncMock(return_value=mock_page)
+    mock.release_page = AsyncMock()
+    
+    mock.page = mock_page # for backward compatibility if any test uses it directly
     return mock
 
 
@@ -75,26 +75,24 @@ def mock_auth_manager():
 @pytest.fixture
 def app_with_mocks(test_config, mock_browser_manager, mock_request_handler, mock_auth_manager):
     """Create FastAPI app with mocked dependencies."""
-    # Patch the global config
-    import src.utils.config
-    original_get_config = src.utils.config.get_config
-    src.utils.config.get_config = lambda: test_config
-    
-    # Create app
-    app = create_app()
-    
-    # Set mock dependencies
-    from src.api.routes import set_dependencies
-    set_dependencies(
-        handler=mock_request_handler,
-        browser=mock_browser_manager,
-        auth=mock_auth_manager,
-    )
-    
-    yield app
-    
-    # Restore original config function
-    src.utils.config.get_config = original_get_config
+    # Patch get_config where it's imported to ensure all parts of the app
+    # use the test configuration. This is crucial for dependencies like API key
+    # security that resolve on module import.
+    with patch('src.api.app.get_config', return_value=test_config), \
+         patch('src.api.routes.get_config', return_value=test_config), \
+         patch('src.api.security.get_config', return_value=test_config):
+        
+        app = create_app()
+        
+        # Set mock dependencies for handlers
+        from src.api.routes import set_dependencies
+        set_dependencies(
+            handler=mock_request_handler,
+            browser=mock_browser_manager,
+            auth=mock_auth_manager,
+        )
+        
+        yield app
 
 
 @pytest.fixture

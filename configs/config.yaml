@@ -15,6 +15,7 @@ browser:
   user_agent: null
   viewport_width: 1920
   viewport_height: 1080
+  initial_pool_size: 5
 
 # Authentication Configuration
 auth:
@@ -37,13 +38,18 @@ performance:
   request_timeout: 60
   retry_attempts: 3
   retry_delay: 1.0
+  cleanup_delay: 300
 
 # Security Configuration
 security:
-  api_key: null
   rate_limit: 100
   cors_origins: "*"
   allowed_hosts: "*"
+
+# API Configuration
+api:
+  keys:
+    - "your-secret-api-key-here" # Replace with your actual API key
 
 # Monitoring Configuration
 monitoring:

@@ -35,7 +35,7 @@ class Message(BaseModel):
 class ChatCompletionRequest(BaseModel):
     """Chat completion request model."""
     model: str = Field(..., description="ID of the model to use")
-    messages: List[Message] = Field(..., min_items=1, max_items=100, description="List of messages")
+    messages: List[Message] = Field(..., min_length=1, max_length=100, description="List of messages")
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Sampling temperature")
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Nucleus sampling parameter")
     max_tokens: Optional[int] = Field(None, ge=1, le=4096, description="Maximum tokens to generate")

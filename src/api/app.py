@@ -164,7 +164,7 @@ def setup_exception_handlers(app: FastAPI):
                     param=None,
                     code=str(exc.status_code),
                 )
-            ).dict()
+            ).model_dump()
         )
     
     @app.exception_handler(RequestValidationError)
@@ -185,7 +185,7 @@ def setup_exception_handlers(app: FastAPI):
                     param=None,
                     code="422",
                 )
-            ).dict()
+            ).model_dump()
         )
     
     @app.exception_handler(StarletteHTTPException)
@@ -207,7 +207,7 @@ def setup_exception_handlers(app: FastAPI):
                     param=None,
                     code=str(exc.status_code),
                 )
-            ).dict()
+            ).model_dump()
         )
     
     @app.exception_handler(Exception)
@@ -230,7 +230,7 @@ def setup_exception_handlers(app: FastAPI):
                     param=None,
                     code="500",
                 )
-            ).dict()
+            ).model_dump()
         )
 
 

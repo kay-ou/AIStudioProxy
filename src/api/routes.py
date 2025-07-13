@@ -7,7 +7,7 @@ This module defines the FastAPI routes for OpenAI-compatible endpoints.
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 
 from .models import (
@@ -24,6 +24,7 @@ from .. import __version__
 from ..core.handler import RequestHandler
 from ..browser.manager import BrowserManager
 from ..auth.manager import AuthManager
+from .security import get_api_key
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -44,7 +45,11 @@ metrics = {
 
 
 @router.post("/v1/chat/completions", response_model=ChatCompletionResponse)
-async def chat_completions(request: ChatCompletionRequest, http_request: Request):
+async def chat_completions(
+    request: ChatCompletionRequest,
+    http_request: Request,
+    api_key: str = Depends(get_api_key)
+):
     """
     Create a chat completion.
     
@@ -201,7 +206,7 @@ async def get_metrics():
         uptime=uptime,
     )
     
-    logger.debug("Metrics retrieved", **response.dict())
+    logger.debug("Metrics retrieved", **response.model_dump())
     
     return response
 

@@ -50,7 +50,8 @@ async def test_validation_exception_handler(async_client):
     """
     Test the request validation exception handler.
     """
-    response = await async_client.post("/v1/chat/completions", json={"invalid": "payload"})
+    headers = {"Authorization": "Bearer test-key"}
+    response = await async_client.post("/v1/chat/completions", json={"invalid": "payload"}, headers=headers)
     assert response.status_code == 422
     json_response = response.json()
     assert json_response["error"]["type"] == "validation_error"

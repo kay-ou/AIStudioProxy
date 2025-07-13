@@ -42,7 +42,8 @@ async def test_chat_completions_unsupported_model(async_client):
     """
     response = await async_client.post(
         "/v1/chat/completions",
-        json={"model": "unsupported-model", "messages": [{"role": "user", "content": "hello"}]}
+        json={"model": "unsupported-model", "messages": [{"role": "user", "content": "hello"}]},
+        headers={"Authorization": "Bearer test-key"}
     )
     assert response.status_code == 400
     assert "is not supported" in response.text
@@ -55,7 +56,8 @@ async def test_chat_completions_no_handler(async_client):
     with patch("src.api.routes.request_handler", None):
         response = await async_client.post(
             "/v1/chat/completions",
-            json={"model": "gemini-2.5-pro", "messages": [{"role": "user", "content": "hello"}]}
+            json={"model": "gemini-2.5-pro", "messages": [{"role": "user", "content": "hello"}]},
+            headers={"Authorization": "Bearer test-key"}
         )
         assert response.status_code == 503
 
@@ -71,7 +73,8 @@ async def test_chat_completions_streaming(async_client):
     with patch("src.api.routes.request_handler.handle_stream_request", new=mock_stream_response):
         response = await async_client.post(
             "/v1/chat/completions",
-            json={"model": "gemini-2.5-pro", "messages": [{"role": "user", "content": "hello"}], "stream": True}
+            json={"model": "gemini-2.5-pro", "messages": [{"role": "user", "content": "hello"}], "stream": True},
+            headers={"Authorization": "Bearer test-key"}
         )
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")

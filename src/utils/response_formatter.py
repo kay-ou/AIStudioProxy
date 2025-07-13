@@ -8,6 +8,7 @@ OpenAI-compatible formats.
 import time
 import uuid
 from typing import Dict, Any
+import tiktoken
 
 from ..api.models import (
     ChatCompletionResponse,
@@ -16,6 +17,18 @@ from ..api.models import (
     Usage,
     MessageRole,
 )
+
+# Initialize tokenizer
+try:
+    encoding = tiktoken.get_encoding("cl100k_base")
+except Exception:
+    encoding = None
+
+def _count_tokens(text: str) -> int:
+    """Counts tokens using tiktoken, with a fallback to word count."""
+    if encoding:
+        return len(encoding.encode(text))
+    return len(text.split())
 
 
 def format_non_streaming_response(
@@ -35,9 +48,8 @@ def format_non_streaming_response(
     request_id = str(uuid.uuid4())
     created_time = int(time.time())
 
-    # Basic token calculation (can be improved)
-    prompt_tokens = len(prompt.split())
-    completion_tokens = len(raw_content.split())
+    prompt_tokens = _count_tokens(prompt)
+    completion_tokens = _count_tokens(raw_content)
     total_tokens = prompt_tokens + completion_tokens
 
     return ChatCompletionResponse(

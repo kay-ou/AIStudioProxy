@@ -9,7 +9,7 @@ from typing import List, Optional
 from pathlib import Path
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import yaml
 
 
@@ -21,8 +21,7 @@ class ServerConfig(BaseSettings):
     workers: int = Field(default=1, ge=1, le=10, description="Number of worker processes")
     debug: bool = Field(default=False, description="Enable debug mode")
     
-    class Config:
-        env_prefix = "SERVER__"
+    model_config = SettingsConfigDict(env_prefix="SERVER__")
 
 
 class BrowserConfig(BaseSettings):
@@ -34,9 +33,9 @@ class BrowserConfig(BaseSettings):
     user_agent: Optional[str] = Field(default=None, description="Custom user agent string")
     viewport_width: int = Field(default=1920, ge=800, description="Browser viewport width")
     viewport_height: int = Field(default=1080, ge=600, description="Browser viewport height")
+    initial_pool_size: int = Field(default=5, ge=1, le=50, description="Initial number of pages in the page pool")
 
-    class Config:
-        env_prefix = "BROWSER__"
+    model_config = SettingsConfigDict(env_prefix="BROWSER__")
 
 
 class AuthConfig(BaseSettings):
@@ -48,8 +47,7 @@ class AuthConfig(BaseSettings):
     file_path: Optional[str] = Field(default=None, description="Path to the authentication file (e.g., cookies.json)")
     cookie_path: Optional[str] = Field(default=None, description="Cookie storage path")
 
-    class Config:
-        env_prefix = "AUTH__"
+    model_config = SettingsConfigDict(env_prefix="AUTH__")
 
 
 class LogConfig(BaseSettings):
@@ -75,8 +73,7 @@ class LogConfig(BaseSettings):
             raise ValueError(f'Log format must be one of: {valid_formats}')
         return v.lower()
     
-    class Config:
-        env_prefix = "LOG__"
+    model_config = SettingsConfigDict(env_prefix="LOG__")
 
 
 class PerformanceConfig(BaseSettings):
@@ -86,21 +83,26 @@ class PerformanceConfig(BaseSettings):
     request_timeout: int = Field(default=60, ge=5, description="Request timeout in seconds")
     retry_attempts: int = Field(default=3, ge=0, le=10, description="Number of retry attempts")
     retry_delay: float = Field(default=1.0, ge=0.1, description="Retry delay in seconds")
+    cleanup_delay: int = Field(default=300, ge=0, description="Delay in seconds before cleaning up request tracking")
 
-    class Config:
-        env_prefix = "PERF__"
+    model_config = SettingsConfigDict(env_prefix="PERF__")
 
 
 class SecurityConfig(BaseSettings):
     """Security configuration settings."""
 
-    api_key: Optional[str] = Field(default=None, description="API key for authentication")
     rate_limit: int = Field(default=100, ge=1, description="Rate limit per minute")
     cors_origins: str = Field(default="*", description="CORS allowed origins")
     allowed_hosts: str = Field(default="*", description="Allowed host patterns")
 
-    class Config:
-        env_prefix = "SECURITY__"
+    model_config = SettingsConfigDict(env_prefix="SECURITY__")
+
+
+class APIConfig(BaseSettings):
+    """API specific configuration."""
+    keys: List[str] = Field(default_factory=list, description="List of valid API keys")
+
+    model_config = SettingsConfigDict(env_prefix="API__")
 
 
 class MonitoringConfig(BaseSettings):
@@ -110,8 +112,7 @@ class MonitoringConfig(BaseSettings):
     metrics_port: int = Field(default=9090, ge=1024, le=65535, description="Metrics server port")
     health_check_interval: int = Field(default=30, ge=5, description="Health check interval in seconds")
 
-    class Config:
-        env_prefix = "MONITORING__"
+    model_config = SettingsConfigDict(env_prefix="MONITORING__")
 
 
 class DevelopmentConfig(BaseSettings):
@@ -121,8 +122,7 @@ class DevelopmentConfig(BaseSettings):
     debug_browser: bool = Field(default=False, description="Enable browser debugging")
     mock_responses: bool = Field(default=False, description="Use mock responses")
 
-    class Config:
-        env_prefix = "DEV__"
+    model_config = SettingsConfigDict(env_prefix="DEV__")
 
 
 class Config(BaseSettings):
@@ -135,6 +135,7 @@ class Config(BaseSettings):
     log: LogConfig = Field(default_factory=LogConfig)
     performance: PerformanceConfig = Field(default_factory=PerformanceConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
+    api: APIConfig = Field(default_factory=APIConfig)
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
     development: DevelopmentConfig = Field(default_factory=DevelopmentConfig)
     
@@ -150,10 +151,11 @@ class Config(BaseSettings):
         description="List of supported AI models"
     )
     
-    class Config:
-        env_file = ".env"
-        env_nested_delimiter = "__"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_nested_delimiter="__",
+        case_sensitive=False,
+    )
     
     @classmethod
     def load_from_yaml(cls, yaml_path: str) -> "Config":
@@ -173,7 +175,7 @@ class Config(BaseSettings):
         yaml_file.parent.mkdir(parents=True, exist_ok=True)
         
         with open(yaml_file, 'w', encoding='utf-8') as f:
-            yaml.dump(self.dict(), f, default_flow_style=False, indent=2)
+            yaml.dump(self.model_dump(), f, default_flow_style=False, indent=2)
     
     def validate_config(self) -> None:
         """Validate the entire configuration."""

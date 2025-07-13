@@ -33,6 +33,7 @@ class BrowserManager(LoggerMixin):
         self.config = config
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
+        self.page_pool: asyncio.Queue = asyncio.Queue()
         self.main_page_controller: Optional[PageController] = None
 
     async def start(self) -> None:
@@ -51,7 +52,12 @@ class BrowserManager(LoggerMixin):
         main_page = await self.browser.new_page()
         self.main_page_controller = PageController(main_page)
         
-        self.logger.info("Browser and main page controller started successfully.")
+        # Pre-fill the page pool
+        for _ in range(self.config.initial_pool_size):
+            page = await self.browser.new_page()
+            await self.page_pool.put(page)
+
+        self.logger.info(f"Browser started with {self.config.initial_pool_size} pages in the pool.")
 
     async def stop(self) -> None:
         """
@@ -64,8 +70,12 @@ class BrowserManager(LoggerMixin):
             self.logger.info("Main page controller closed.")
             
         if self.browser and self.browser.is_connected():
+            # Close all pages in the pool
+            while not self.page_pool.empty():
+                page = await self.page_pool.get()
+                await page.close()
             await self.browser.close()
-            self.logger.info("Browser closed.")
+            self.logger.info("Browser and all pages closed.")
             
         if self.playwright:
             await self.playwright.stop()
@@ -109,6 +119,20 @@ class BrowserManager(LoggerMixin):
         except Exception as e:
             self.logger.error("Browser health check failed", error=str(e))
             return False
+
+    async def get_page(self):
+        """Get a page from the pool or create a new one."""
+        if self.page_pool.empty():
+            self.logger.warning("Page pool is empty, creating a new page.")
+            if not self.browser:
+                raise ConnectionError("Browser is not running.")
+            return await self.browser.new_page()
+        return await self.page_pool.get()
+
+    async def release_page(self, page):
+        """Release a page back to the pool."""
+        if not page.is_closed():
+            await self.page_pool.put(page)
 
     async def launch_browser(self) -> Browser:
         """
