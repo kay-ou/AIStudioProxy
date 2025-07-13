@@ -7,7 +7,7 @@ This module defines Pydantic models for OpenAI-compatible API requests and respo
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class MessageRole(str, Enum):
@@ -23,7 +23,7 @@ class Message(BaseModel):
     content: str = Field(..., description="The content of the message")
     name: Optional[str] = Field(None, description="The name of the author")
     
-    @validator('content')
+    @field_validator('content')
     def validate_content(cls, v):
         if not v or not v.strip():
             raise ValueError("Message content cannot be empty")
@@ -45,7 +45,7 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="Frequency penalty")
     user: Optional[str] = Field(None, description="Unique identifier for the end-user")
     
-    @validator('messages')
+    @field_validator('messages')
     def validate_messages(cls, v):
         if not v:
             raise ValueError("Messages list cannot be empty")
@@ -57,7 +57,7 @@ class ChatCompletionRequest(BaseModel):
         
         return v
     
-    @validator('model')
+    @field_validator('model')
     def validate_model(cls, v):
         # This will be validated against supported models in the handler
         if not v or not v.strip():

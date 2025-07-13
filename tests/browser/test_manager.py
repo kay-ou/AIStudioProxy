@@ -24,7 +24,7 @@ async def test_browser_manager_start_stop(mock_async_playwright, mock_browser_co
     # Mock Playwright and Browser objects
     mock_playwright = AsyncMock()
     mock_browser = AsyncMock()
-    mock_browser.is_connected.return_value = True
+    mock_browser.is_connected = MagicMock(return_value=True)
     
     # When async_playwright() is called, it returns a context manager.
     # We mock the start() method to return the playwright object.
@@ -61,7 +61,7 @@ async def test_browser_manager_health_check(mock_browser_config):
     
     # Mock a healthy browser
     mock_browser = AsyncMock()
-    mock_browser.is_connected.return_value = True
+    mock_browser.is_connected = MagicMock(return_value=True)
     mock_page = AsyncMock()
     mock_browser.new_page.return_value = mock_page
     manager.browser = mock_browser

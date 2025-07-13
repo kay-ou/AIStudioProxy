@@ -8,7 +8,7 @@ that supports environment variables, YAML files, and validation.
 from typing import List, Optional
 from pathlib import Path
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 import yaml
 
@@ -60,14 +60,14 @@ class LogConfig(BaseSettings):
     max_size: str = Field(default="10MB", description="Maximum log file size")
     backup_count: int = Field(default=5, ge=1, description="Number of backup log files")
     
-    @validator('level')
+    @field_validator('level')
     def validate_log_level(cls, v):
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if v.upper() not in valid_levels:
             raise ValueError(f'Log level must be one of: {valid_levels}')
         return v.upper()
     
-    @validator('format')
+    @field_validator('format')
     def validate_log_format(cls, v):
         valid_formats = ['json', 'text']
         if v.lower() not in valid_formats:
