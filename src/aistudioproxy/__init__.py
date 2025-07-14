@@ -1,5 +1,5 @@
 """
-AIStudioProxy - Lightweight Google AI Studio proxy with OpenAI API compatibility.
+AIStudioProxy - A lightweight Google AI Studio proxy.
 
 This package provides a high-performance, lightweight proxy service that wraps
 Google AI Studio with OpenAI-compatible API endpoints using browser automation.

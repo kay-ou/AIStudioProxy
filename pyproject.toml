@@ -99,6 +99,7 @@ flake8 = "^7.0.0"
 pre-commit = "^3.6.0"
 pytest-mock = "^3.14.1"
 
+aiohttp = "^3.9.5"
 [tool.poetry.scripts]
 aistudio-proxy = "aistudioproxy.main:main"
 

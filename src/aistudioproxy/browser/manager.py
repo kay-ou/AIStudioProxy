@@ -10,11 +10,11 @@ and health checks.
 import asyncio
 from typing import Optional
 
-from playwright.async_api import Browser, Playwright, async_playwright
 from camoufox import Camoufox
+from playwright.async_api import Browser, Playwright, async_playwright
 
-from ..utils.logger import LoggerMixin
 from ..utils.config import BrowserConfig
+from ..utils.logger import LoggerMixin
 from .page_controller import PageController
 
 
@@ -47,17 +47,19 @@ class BrowserManager(LoggerMixin):
 
         self.playwright = await async_playwright().start()
         self.browser = await self.launch_browser()
-        
+
         # Create a main page to be used for background tasks like keep-alive
         main_page = await self.browser.new_page()
         self.main_page_controller = PageController(main_page)
-        
+
         # Pre-fill the page pool
         for _ in range(self.config.initial_pool_size):
             page = await self.browser.new_page()
             await self.page_pool.put(page)
 
-        self.logger.info(f"Browser started with {self.config.initial_pool_size} pages in the pool.")
+        self.logger.info(
+            f"Browser started with {self.config.initial_pool_size} pages in the pool."
+        )
 
     async def stop(self) -> None:
         """
@@ -68,7 +70,7 @@ class BrowserManager(LoggerMixin):
             await self.main_page_controller.close()
             self.main_page_controller = None
             self.logger.info("Main page controller closed.")
-            
+
         if self.browser and self.browser.is_connected():
             # Close all pages in the pool
             while not self.page_pool.empty():
@@ -76,11 +78,11 @@ class BrowserManager(LoggerMixin):
                 await page.close()
             await self.browser.close()
             self.logger.info("Browser and all pages closed.")
-            
+
         if self.playwright:
             await self.playwright.stop()
             self.logger.info("Playwright stopped.")
-            
+
         self.browser = None
         self.playwright = None
 
@@ -141,19 +143,20 @@ class BrowserManager(LoggerMixin):
         Returns:
             The launched browser instance.
         """
-        self.logger.info("Launching browser with Camoufox...", headless=self.config.headless)
-        
-        fox = Camoufox(
-            browser_type="chromium",
-            playwright_handle=self.playwright
+        self.logger.info(
+            "Launching browser with Camoufox...", headless=self.config.headless
         )
-        
-        browser = await fox.launch(options={  # type: ignore
-            "headless": self.config.headless,
-            "args": [
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                f"--remote-debugging-port={self.config.port}",
-            ],
-        })
+
+        fox = Camoufox(browser_type="chromium", playwright_handle=self.playwright)
+
+        browser = await fox.launch(
+            options={  # type: ignore
+                "headless": self.config.headless,
+                "args": [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    f"--remote-debugging-port={self.config.port}",
+                ],
+            }
+        )
         return browser

@@ -13,19 +13,16 @@ from typing import AsyncGenerator
 
 from fastapi import HTTPException
 
-from ..api.models import (
-    ChatCompletionRequest,
-    ChatCompletionResponse,
-)
-from ..utils.logger import LoggerMixin
-from ..utils.config import get_config
+from ..api.models import ChatCompletionRequest, ChatCompletionResponse
 from ..browser.page_controller import PageController
+from ..utils.config import get_config
+from ..utils.logger import LoggerMixin
 from ..utils.response_formatter import (
+    _count_tokens,
+    format_final_stream_chunk,
+    format_initial_stream_chunk,
     format_non_streaming_response,
     format_streaming_chunk,
-    format_initial_stream_chunk,
-    format_final_stream_chunk,
-    _count_tokens,
 )
 
 
@@ -41,17 +38,21 @@ class RequestHandler(LoggerMixin):
         """
         self.browser_manager = browser_manager
         self.config = get_config()
-        
+
         # Concurrency control
         max_concurrency = self.config.performance.max_concurrent_requests
         self.semaphore = asyncio.Semaphore(max_concurrency)
-        self.logger.info(f"Request handler initialized with max concurrency: {max_concurrency}")
+        self.logger.info(
+            f"Request handler initialized with max concurrency: {max_concurrency}"
+        )
 
         # Request tracking
         self.active_requests = {}
         self._background_tasks = set()
 
-    async def handle_request(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
+    async def handle_request(
+        self, request: ChatCompletionRequest
+    ) -> ChatCompletionResponse:
         """
         Handle a non-streaming chat completion request.
 
@@ -80,15 +81,19 @@ class RequestHandler(LoggerMixin):
                 self.active_requests[request_id] = {
                     "start_time": time.time(),
                     "model": request.model,
-                    "status": "processing"
+                    "status": "processing",
                 }
 
                 if not self.browser_manager or not self.browser_manager.is_running():
-                    raise HTTPException(status_code=503, detail="Browser is not running")
+                    raise HTTPException(
+                        status_code=503, detail="Browser is not running"
+                    )
 
                 page = await self.browser_manager.get_page()
                 if not page:
-                    raise HTTPException(status_code=503, detail="No available page in browser")
+                    raise HTTPException(
+                        status_code=503, detail="No available page in browser"
+                    )
 
                 controller = PageController(page)
 
@@ -101,15 +106,19 @@ class RequestHandler(LoggerMixin):
 
                 # Wait for response
                 raw_response = await controller.wait_for_response()
-                
+
                 # Check for errors in response
                 error_message = await controller.is_error_response()
                 if error_message:
-                    raise HTTPException(status_code=500, detail=f"AI Studio Error: {error_message}")
+                    raise HTTPException(
+                        status_code=500, detail=f"AI Studio Error: {error_message}"
+                    )
 
                 # Format response
-                response = format_non_streaming_response(raw_response, request.model, prompt)
-                response.id = request_id # Ensure consistent request ID
+                response = format_non_streaming_response(
+                    raw_response, request.model, prompt
+                )
+                response.id = request_id  # Ensure consistent request ID
 
                 # Update request tracking
                 self.active_requests[request_id]["status"] = "completed"
@@ -137,7 +146,9 @@ class RequestHandler(LoggerMixin):
                 self._background_tasks.add(task)
                 task.add_done_callback(self._background_tasks.discard)
 
-    async def handle_stream_request(self, request: ChatCompletionRequest) -> AsyncGenerator[str, None]:
+    async def handle_stream_request(
+        self, request: ChatCompletionRequest
+    ) -> AsyncGenerator[str, None]:
         """
         Handle a streaming chat completion request.
 
@@ -161,15 +172,19 @@ class RequestHandler(LoggerMixin):
                 self.active_requests[request_id] = {
                     "start_time": time.time(),
                     "model": request.model,
-                    "status": "streaming"
+                    "status": "streaming",
                 }
 
                 if not self.browser_manager or not self.browser_manager.is_running():
-                    raise HTTPException(status_code=503, detail="Browser is not running")
+                    raise HTTPException(
+                        status_code=503, detail="Browser is not running"
+                    )
 
                 page = await self.browser_manager.get_page()
                 if not page:
-                    raise HTTPException(status_code=503, detail="No available page in browser")
+                    raise HTTPException(
+                        status_code=503, detail="No available page in browser"
+                    )
 
                 controller = PageController(page)
 
@@ -186,25 +201,29 @@ class RequestHandler(LoggerMixin):
                 async for chunk in controller.start_streaming_response():
                     completion_tokens += _count_tokens(chunk)
                     yield format_streaming_chunk(chunk, request.model, request_id)
-                
+
                 # Check for errors after streaming
                 error_message = await controller.is_error_response()
                 if error_message:
-                    raise HTTPException(status_code=500, detail=f"AI Studio Error: {error_message}")
+                    raise HTTPException(
+                        status_code=500, detail=f"AI Studio Error: {error_message}"
+                    )
 
                 yield format_final_stream_chunk(request.model, request_id)
                 yield "data: [DONE]\n\n"
 
                 # Update request tracking with usage
                 prompt_tokens = _count_tokens(prompt)
-                self.active_requests[request_id].update({
-                    "status": "completed",
-                    "usage": {
-                        "prompt_tokens": prompt_tokens,
-                        "completion_tokens": completion_tokens,
-                        "total_tokens": prompt_tokens + completion_tokens,
+                self.active_requests[request_id].update(
+                    {
+                        "status": "completed",
+                        "usage": {
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": prompt_tokens + completion_tokens,
+                        },
                     }
-                })
+                )
                 self.log_method_result("handle_stream_request", request_id=request_id)
 
             except Exception as e:
@@ -213,7 +232,9 @@ class RequestHandler(LoggerMixin):
                 self.log_error(e, context={"request_id": request_id})
                 # Yield a user-friendly error message in SSE format if possible
                 if isinstance(e, HTTPException):
-                    error_content = {"error": {"message": e.detail, "type": "api_error"}}
+                    error_content = {
+                        "error": {"message": e.detail, "type": "api_error"}
+                    }
                     yield f"data: {json.dumps(error_content)}\n\n"
                 yield "data: [DONE]\n\n"
                 # Do not re-raise, as the stream is the response
@@ -223,7 +244,6 @@ class RequestHandler(LoggerMixin):
                 task = asyncio.create_task(self._cleanup_request(request_id))
                 self._background_tasks.add(task)
                 task.add_done_callback(self._background_tasks.discard)
-
 
     async def health_check(self) -> bool:
         """

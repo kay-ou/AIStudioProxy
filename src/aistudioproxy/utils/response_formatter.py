@@ -7,15 +7,16 @@ OpenAI-compatible formats.
 
 import time
 import uuid
-from typing import Dict, Any
+from typing import Any, Dict
+
 import tiktoken
 
 from ..api.models import (
-    ChatCompletionResponse,
     ChatCompletionChoice,
+    ChatCompletionResponse,
     Message,
-    Usage,
     MessageRole,
+    Usage,
 )
 
 # Initialize tokenizer
@@ -23,6 +24,7 @@ try:
     encoding = tiktoken.get_encoding("cl100k_base")
 except Exception:
     encoding = None
+
 
 def _count_tokens(text: str) -> int:
     """Counts tokens using tiktoken, with a fallback to word count."""
@@ -59,7 +61,9 @@ def format_non_streaming_response(
         choices=[
             ChatCompletionChoice(
                 index=0,
-                message=Message(role=MessageRole.ASSISTANT, content=raw_content, name=None),
+                message=Message(
+                    role=MessageRole.ASSISTANT, content=raw_content, name=None
+                ),
                 finish_reason="stop",
             )
         ],
@@ -72,6 +76,7 @@ def format_non_streaming_response(
 
 
 import json
+
 
 def format_streaming_chunk(content_chunk: str, model: str, request_id: str) -> str:
     """
@@ -90,13 +95,16 @@ def format_streaming_chunk(content_chunk: str, model: str, request_id: str) -> s
         "object": "chat.completion.chunk",
         "created": int(time.time()),
         "model": model,
-        "choices": [{
-            "index": 0,
-            "delta": {"content": content_chunk},
-            "finish_reason": None,
-        }]
+        "choices": [
+            {
+                "index": 0,
+                "delta": {"content": content_chunk},
+                "finish_reason": None,
+            }
+        ],
     }
     return f"data: {json.dumps(chunk_data)}\n\n"
+
 
 def format_initial_stream_chunk(model: str, request_id: str) -> str:
     """
@@ -107,13 +115,16 @@ def format_initial_stream_chunk(model: str, request_id: str) -> str:
         "object": "chat.completion.chunk",
         "created": int(time.time()),
         "model": model,
-        "choices": [{
-            "index": 0,
-            "delta": {"role": "assistant"},
-            "finish_reason": None,
-        }]
+        "choices": [
+            {
+                "index": 0,
+                "delta": {"role": "assistant"},
+                "finish_reason": None,
+            }
+        ],
     }
     return f"data: {json.dumps(chunk_data)}\n\n"
+
 
 def format_final_stream_chunk(model: str, request_id: str) -> str:
     """
@@ -124,10 +135,12 @@ def format_final_stream_chunk(model: str, request_id: str) -> str:
         "object": "chat.completion.chunk",
         "created": int(time.time()),
         "model": model,
-        "choices": [{
-            "index": 0,
-            "delta": {},
-            "finish_reason": "stop",
-        }]
+        "choices": [
+            {
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop",
+            }
+        ],
     }
     return f"data: {json.dumps(chunk_data)}\n\n"

@@ -8,9 +8,9 @@ browser session remains active and authenticated.
 
 import asyncio
 
-from ..utils.logger import LoggerMixin
 from ..auth.manager import AuthManager
 from ..browser.manager import BrowserManager
+from ..utils.logger import LoggerMixin
 
 
 class KeepAliveService(LoggerMixin):
@@ -67,20 +67,28 @@ class KeepAliveService(LoggerMixin):
         """
         The main loop for the keep-alive service.
         """
-        self.logger.info(f"Starting keep-alive loop with {self.check_interval}s interval.")
+        self.logger.info(
+            f"Starting keep-alive loop with {self.check_interval}s interval."
+        )
         while True:
             try:
                 await asyncio.sleep(self.check_interval)
                 self.logger.info("Running scheduled session check...")
-                
-                is_alive = await self.auth_manager.check_session_status(self.browser_manager)
-                
+
+                is_alive = await self.auth_manager.check_session_status(
+                    self.browser_manager
+                )
+
                 if not is_alive:
-                    self.logger.warning("Session is not active. Attempting to re-login.")
+                    self.logger.warning(
+                        "Session is not active. Attempting to re-login."
+                    )
                     try:
                         await self.auth_manager.login(self.browser_manager)
                     except Exception as e:
-                        self.logger.error("Failed to re-login during keep-alive check.", error=e)
+                        self.logger.error(
+                            "Failed to re-login during keep-alive check.", error=e
+                        )
                 else:
                     self.logger.info("Session is active.")
 
@@ -88,6 +96,8 @@ class KeepAliveService(LoggerMixin):
                 self.logger.info("Keep-alive loop cancelled.")
                 break
             except Exception as e:
-                self.logger.error("An unexpected error occurred in the keep-alive loop.", error=e)
+                self.logger.error(
+                    "An unexpected error occurred in the keep-alive loop.", error=e
+                )
                 # Wait before retrying to avoid rapid-fire errors
                 await asyncio.sleep(self.check_interval)

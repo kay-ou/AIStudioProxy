@@ -1,15 +1,19 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
-from aistudioproxy.main import main
 from aistudioproxy.api.app import app
+from aistudioproxy.main import main
 
-@patch('uvicorn.run')
-@patch('aistudioproxy.main.get_config')
-@patch('aistudioproxy.main.init_logging')
-@patch('aistudioproxy.main.setup_signal_handlers')
-@patch('argparse.ArgumentParser')
-def test_main(mock_arg_parser, mock_setup_signals, mock_init_logging, mock_get_config, mock_run):
+
+@patch("uvicorn.run")
+@patch("aistudioproxy.main.get_config")
+@patch("aistudioproxy.main.init_logging")
+@patch("aistudioproxy.main.setup_signal_handlers")
+@patch("argparse.ArgumentParser")
+def test_main(
+    mock_arg_parser, mock_setup_signals, mock_init_logging, mock_get_config, mock_run
+):
     """Test the main function."""
     # Mock command line arguments
     mock_args = MagicMock()

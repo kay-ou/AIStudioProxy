@@ -7,10 +7,11 @@ managing interactions with the AI Studio page, including navigation,
 initialization, and basic operations.
 """
 
-from typing import Optional, AsyncGenerator
 import asyncio
+from typing import AsyncGenerator, Optional
 
-from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import Page
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from ..utils.logger import LoggerMixin
 from ..utils.retry import async_retry
@@ -45,12 +46,14 @@ class PageController(LoggerMixin):
         Navigate to the AI Studio page and wait for it to load.
         """
         self.log_method_call("navigate_to_aistudio")
-        
+
         if self.page.url == self.AISTUDIO_URL:
             self.logger.info("Already at AI Studio page.")
             return
 
-        await self.page.goto(self.AISTUDIO_URL, wait_until="load", timeout=self.default_timeout)
+        await self.page.goto(
+            self.AISTUDIO_URL, wait_until="load", timeout=self.default_timeout
+        )
         self.logger.info("Navigated to AI Studio page.")
 
     @async_retry()
@@ -70,7 +73,9 @@ class PageController(LoggerMixin):
             raise
 
     @async_retry()
-    async def fill(self, selector: str, text: str, timeout: Optional[int] = None) -> None:
+    async def fill(
+        self, selector: str, text: str, timeout: Optional[int] = None
+    ) -> None:
         """
         Fill an input element with text.
 
@@ -81,13 +86,17 @@ class PageController(LoggerMixin):
         """
         self.log_method_call("fill", selector=selector)
         try:
-            await self.page.fill(selector, text, timeout=timeout or self.default_timeout)
+            await self.page.fill(
+                selector, text, timeout=timeout or self.default_timeout
+            )
         except PlaywrightTimeoutError:
             self.logger.error("Timeout while filling element", selector=selector)
             raise
 
     @async_retry()
-    async def wait_for_selector(self, selector: str, timeout: Optional[int] = None, **kwargs) -> None:
+    async def wait_for_selector(
+        self, selector: str, timeout: Optional[int] = None, **kwargs
+    ) -> None:
         """
         Wait for an element to appear on the page.
 
@@ -102,7 +111,9 @@ class PageController(LoggerMixin):
                 selector, timeout=timeout or self.default_timeout, **kwargs
             )
         except PlaywrightTimeoutError:
-            self.logger.error("Timeout while waiting for selector", selector=selector, **kwargs)
+            self.logger.error(
+                "Timeout while waiting for selector", selector=selector, **kwargs
+            )
             raise
 
     async def close(self) -> None:
@@ -113,7 +124,6 @@ class PageController(LoggerMixin):
         if not self.page.is_closed():
             await self.page.close()
             self.logger.info("Page closed.")
-
 
     async def is_logged_in(self, timeout: Optional[int] = 5000) -> bool:
         """
@@ -130,19 +140,16 @@ class PageController(LoggerMixin):
         # for example, a user profile button or avatar.
         # TODO: Replace with a more reliable selector for AI Studio.
         login_indicator_selector = 'button[aria-label="Google Account"]'
-        
+
         try:
             await self.page.wait_for_selector(
-                login_indicator_selector, 
-                state="visible",
-                timeout=timeout
+                login_indicator_selector, state="visible", timeout=timeout
             )
             self.logger.info("Login indicator found, user is logged in.")
             return True
         except PlaywrightTimeoutError:
             self.logger.warning("Login indicator not found, user is not logged in.")
             return False
-
 
     @async_retry(attempts=3)
     async def switch_model(self, model_name: str) -> None:
@@ -151,13 +158,13 @@ class PageController(LoggerMixin):
 
         Args:
             model_name: The name of the model to switch to (e.g., "Gemini 1.5 Pro").
-        
+
         Raises:
             ValueError: If the specified model is not found or cannot be selected.
             PlaywrightTimeoutError: If a timeout occurs during the operation.
         """
         self.log_method_call("switch_model", model_name=model_name)
-        
+
         model_menu_selector = 'button[aria-label="Model"]'
         try:
             await self.click(model_menu_selector)
@@ -175,7 +182,9 @@ class PageController(LoggerMixin):
             raise ValueError(f"Model '{model_name}' not found.")
 
         try:
-            await self.page.wait_for_selector(f'button[aria-label="Model"]:has-text("{model_name}")', state="visible")
+            await self.page.wait_for_selector(
+                f'button[aria-label="Model"]:has-text("{model_name}")', state="visible"
+            )
             self.logger.info(f"Successfully switched to model: {model_name}")
         except PlaywrightTimeoutError:
             self.logger.error(f"Failed to verify model switch to '{model_name}'.")
@@ -187,29 +196,28 @@ class PageController(LoggerMixin):
 
         Args:
             message: The message to send.
-        
+
         Raises:
             ValueError: If the chat input or send button is not found.
         """
         self.log_method_call("send_message")
-        
+
         chat_input_selector = 'div[aria-label="Chat input"]'
         send_button_selector = 'button[aria-label="Send message"]'
-        
+
         try:
             await self.fill(chat_input_selector, message)
             self.logger.info("Filled chat input with message.")
         except PlaywrightTimeoutError:
             self.logger.error("Failed to find chat input.")
             raise ValueError("Chat input not found.")
-            
+
         try:
             await self.click(send_button_selector)
             self.logger.info("Clicked send button.")
         except PlaywrightTimeoutError:
             self.logger.error("Failed to find send button.")
             raise ValueError("Send button not found.")
-
 
     async def wait_for_response(self) -> str:
         """
@@ -231,38 +239,33 @@ class PageController(LoggerMixin):
         self.log_method_call("wait_for_response")
 
         stop_generating_selector = 'button[aria-label="Stop generating"]'
-        
+
         self.logger.info("Waiting for response generation to start...")
-        await self.wait_for_selector(
-            stop_generating_selector,
-            state="visible"
-        )
+        await self.wait_for_selector(stop_generating_selector, state="visible")
         self.logger.info("Response generation started.")
 
         self.logger.info("Waiting for response generation to complete...")
-        await self.wait_for_selector(
-            stop_generating_selector,
-            state="hidden"
-        )
+        await self.wait_for_selector(stop_generating_selector, state="hidden")
         self.logger.info("Response generation completed.")
 
         # After the response is complete, we need to get the content.
         # The responses are in a div with class "response-block". We want the last one.
         response_selector = ".response-block:last-child"
-        
+
         try:
             response_element = await self.page.query_selector(response_selector)
             if not response_element:
                 self.logger.error("Could not find response block element.")
                 raise ValueError("Response block not found.")
-            
+
             response_text = await response_element.inner_text()
-            self.logger.info("Extracted response text.", response_length=len(response_text))
+            self.logger.info(
+                "Extracted response text.", response_length=len(response_text)
+            )
             return response_text
         except Exception as e:
             self.logger.error("Failed to extract response text.", error=e)
             raise ValueError("Failed to extract response text.")
-
 
     async def start_streaming_response(self) -> AsyncGenerator[str, None]:
         """
@@ -274,7 +277,7 @@ class PageController(LoggerMixin):
 
         Yields:
             str: A chunk of the response text.
-        
+
         Raises:
             asyncio.TimeoutError: If the response generation does not start or
                                   end within the expected timeout.
@@ -294,9 +297,12 @@ class PageController(LoggerMixin):
         response_container_selector = ".chat-history"
         stop_generating_selector = 'button[aria-label="Stop generating"]'
 
-        js_code = """
+        js_code = (
+            """
         () => {
-            const targetNode = document.querySelector('""" + response_container_selector + """');
+            const targetNode = document.querySelector('"""
+            + response_container_selector
+            + """');
             if (!targetNode) {
                 console.error('Response container not found');
                 window.onResponseDone();
@@ -334,10 +340,14 @@ class PageController(LoggerMixin):
             responseObserver.observe(targetNode, { childList: true });
 
             // Handle completion
-            const stopButton = document.querySelector('""" + stop_generating_selector + """');
+            const stopButton = document.querySelector('"""
+            + stop_generating_selector
+            + """');
             if (stopButton) {
                 const doneObserver = new MutationObserver(() => {
-                    if (!document.querySelector('""" + stop_generating_selector + """')) {
+                    if (!document.querySelector('"""
+            + stop_generating_selector
+            + """')) {
                         doneObserver.disconnect();
                         // Final check for any remaining text
                         if (lastResponseBlock) {
@@ -356,7 +366,8 @@ class PageController(LoggerMixin):
             }
         }
         """
-        
+        )
+
         # Wait for generation to start
         self.logger.info("Waiting for response generation to start...")
         await self.wait_for_selector(stop_generating_selector, state="visible")
@@ -368,7 +379,9 @@ class PageController(LoggerMixin):
         while True:
             try:
                 # Wait for a new chunk with a timeout
-                chunk = await asyncio.wait_for(queue.get(), timeout=self.default_timeout / 1000)
+                chunk = await asyncio.wait_for(
+                    queue.get(), timeout=self.default_timeout / 1000
+                )
                 if chunk is None:
                     self.logger.info("End of stream signal received.")
                     break
@@ -377,11 +390,12 @@ class PageController(LoggerMixin):
                 self.logger.error("Timeout waiting for next stream chunk.")
                 # Check if the stop button is gone, which means we are done
                 if not await self.page.query_selector(stop_generating_selector):
-                    self.logger.info("Stop button disappeared, assuming stream is complete.")
+                    self.logger.info(
+                        "Stop button disappeared, assuming stream is complete."
+                    )
                     break
                 else:
-                    raise # Re-raise if we timed out but generation is supposedly still active
-
+                    raise  # Re-raise if we timed out but generation is supposedly still active
 
     async def is_error_response(self) -> Optional[str]:
         """
@@ -391,19 +405,25 @@ class PageController(LoggerMixin):
             The error message text if an error is found, otherwise None.
         """
         self.log_method_call("is_error_response")
-        
+
         for selector in self.error_selectors:
             try:
-                error_element = await self.page.query_selector(f".response-block:last-child {selector}")
+                error_element = await self.page.query_selector(
+                    f".response-block:last-child {selector}"
+                )
                 if error_element:
                     error_text = await error_element.inner_text()
-                    self.logger.warning("Error response detected.", selector=selector, error_text=error_text)
+                    self.logger.warning(
+                        "Error response detected.",
+                        selector=selector,
+                        error_text=error_text,
+                    )
                     return error_text
             except Exception as e:
                 self.logger.debug(
                     "Could not check for error selector, it might not exist.",
                     selector=selector,
-                    error=str(e)
+                    error=str(e),
                 )
-        
+
         return None

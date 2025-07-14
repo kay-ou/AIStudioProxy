@@ -10,6 +10,7 @@ import pytest
 
 from aistudioproxy.utils.retry import async_retry
 
+
 @pytest.mark.asyncio
 async def test_async_retry_success_on_first_attempt():
     """
@@ -23,13 +24,16 @@ async def test_async_retry_success_on_first_attempt():
     assert result == "success"
     mock_func.assert_awaited_once()
 
+
 @pytest.mark.asyncio
-@patch('aistudioproxy.utils.retry.logger')
+@patch("aistudioproxy.utils.retry.logger")
 async def test_async_retry_success_after_failures(mock_logger):
     """
     Test that the decorator succeeds after a few failed attempts.
     """
-    mock_func = AsyncMock(side_effect=[ValueError("fail"), ValueError("fail"), "success"])
+    mock_func = AsyncMock(
+        side_effect=[ValueError("fail"), ValueError("fail"), "success"]
+    )
 
     decorated_func = async_retry(attempts=3, initial_delay=0.01)(mock_func)
     result = await decorated_func()
@@ -37,8 +41,9 @@ async def test_async_retry_success_after_failures(mock_logger):
     assert result == "success"
     assert mock_func.call_count == 3
 
+
 @pytest.mark.asyncio
-@patch('aistudioproxy.utils.retry.logger')
+@patch("aistudioproxy.utils.retry.logger")
 async def test_async_retry_fails_after_max_attempts(mock_logger):
     """
     Test that the decorator raises the last exception after all attempts fail.
@@ -52,15 +57,16 @@ async def test_async_retry_fails_after_max_attempts(mock_logger):
 
     assert mock_func.call_count == 3
 
+
 @pytest.mark.asyncio
 @patch("asyncio.sleep", new_callable=AsyncMock)
-@patch('aistudioproxy.utils.retry.logger')
+@patch("aistudioproxy.utils.retry.logger")
 async def test_async_retry_uses_exponential_backoff(mock_logger, mock_sleep):
     """
     Test that the decorator uses exponential backoff for delays.
     """
     mock_func = AsyncMock(side_effect=[ValueError, ValueError, "success"])
-    
+
     decorated_func = async_retry(attempts=3, initial_delay=0.1, factor=2)(mock_func)
     await decorated_func()
 

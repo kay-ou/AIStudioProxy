@@ -7,23 +7,23 @@ This module defines the FastAPI routes for OpenAI-compatible endpoints.
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from .. import __version__
+from ..auth.manager import AuthManager
+from ..browser.manager import BrowserManager
+from ..core.handler import RequestHandler
+from ..utils.config import get_config
+from ..utils.logger import get_logger
 from .models import (
     ChatCompletionRequest,
     ChatCompletionResponse,
-    ModelListResponse,
-    Model,
     HealthResponse,
     MetricsResponse,
+    Model,
+    ModelListResponse,
 )
-from ..utils.logger import get_logger
-from ..utils.config import get_config
-from .. import __version__
-from ..core.handler import RequestHandler
-from ..browser.manager import BrowserManager
-from ..auth.manager import AuthManager
 from .security import get_api_key
 
 logger = get_logger(__name__)
@@ -48,29 +48,29 @@ metrics = {
 async def chat_completions(
     request: ChatCompletionRequest,
     http_request: Request,
-    api_key: str = Depends(get_api_key)
+    api_key: str = Depends(get_api_key),
 ):
     """
     Create a chat completion.
-    
+
     This endpoint is compatible with OpenAI's chat completions API.
     """
-    request_id = getattr(http_request.state, 'request_id', 'unknown')
+    request_id = getattr(http_request.state, "request_id", "unknown")
     start_time_req = time.time()
-    
+
     try:
         # Update metrics
         metrics["requests_total"] += 1
-        
+
         # Validate model
         config = get_config()
         if request.model not in config.supported_models:
             raise HTTPException(
                 status_code=400,
                 detail=f"Model '{request.model}' is not supported. "
-                       f"Supported models: {', '.join(config.supported_models)}"
+                f"Supported models: {', '.join(config.supported_models)}",
             )
-        
+
         logger.info(
             "Processing chat completion request",
             request_id=request_id,
@@ -78,19 +78,19 @@ async def chat_completions(
             message_count=len(request.messages),
             stream=request.stream,
         )
-        
+
         # Check if request handler is available
         if request_handler is None:
             raise HTTPException(
                 status_code=503,
-                detail="Service not ready - request handler not initialized"
+                detail="Service not ready - request handler not initialized",
             )
 
         # Process the request through the handler
         if request.stream:
             return StreamingResponse(
                 request_handler.handle_stream_request(request),
-                media_type="text/event-stream"
+                media_type="text/event-stream",
             )
         else:
             response = await request_handler.handle_request(request)
@@ -101,7 +101,7 @@ async def chat_completions(
             metrics["response_times"].append(process_time)
 
             return response
-    
+
     except HTTPException:
         metrics["requests_error"] += 1
         raise
@@ -120,18 +120,14 @@ async def chat_completions(
 async def list_models():
     """List available models."""
     config = get_config()
-    
+
     models = [
-        Model(
-            id=model_id,
-            created=int(time.time()),
-            owned_by="google"
-        )
+        Model(id=model_id, created=int(time.time()), owned_by="google")
         for model_id in config.supported_models
     ]
-    
+
     logger.debug("Listed available models", model_count=len(models))
-    
+
     return ModelListResponse(data=models)
 
 
@@ -139,7 +135,7 @@ async def list_models():
 async def health_check():
     """Health check endpoint."""
     uptime = time.time() - start_time
-    
+
     # Check browser status
     browser_status = "unknown"
     if browser_manager:
@@ -149,13 +145,15 @@ async def health_check():
         except Exception as e:
             browser_status = f"error: {str(e)}"
             logger.warning("Browser health check failed", error=str(e))
-    
+
     # Check auth status
     auth_status = "unknown"
     if auth_manager:
         try:
             auth_healthy = await auth_manager.health_check()
-            auth_status = auth_manager.status.value if auth_manager.status else "unknown"
+            auth_status = (
+                auth_manager.status.value if auth_manager.status else "unknown"
+            )
             if not auth_healthy:
                 auth_status = f"unhealthy ({auth_status})"
         except Exception as e:
@@ -165,7 +163,7 @@ async def health_check():
     # Determine overall status
     is_healthy = browser_status == "healthy" and "unhealthy" not in auth_status
     overall_status = "healthy" if is_healthy else "unhealthy"
-    
+
     response = HealthResponse(
         status=overall_status,
         timestamp=int(time.time()),
@@ -174,9 +172,9 @@ async def health_check():
         browser_status=browser_status,
         auth_status=auth_status,
     )
-    
+
     logger.debug("Health check completed", status=overall_status)
-    
+
     return response
 
 
@@ -184,18 +182,23 @@ async def health_check():
 async def get_metrics():
     """Get service metrics."""
     uptime = time.time() - start_time
-    
+
     # Calculate average response time
     avg_response_time = 0.0
     if metrics["response_times"]:
-        avg_response_time = sum(metrics["response_times"]) / len(metrics["response_times"])
+        avg_response_time = sum(metrics["response_times"]) / len(
+            metrics["response_times"]
+        )
         # Keep only recent response times (last 1000)
         if len(metrics["response_times"]) > 1000:
             metrics["response_times"] = metrics["response_times"][-1000:]
-    
+
     # Get browser sessions count
-    browser_sessions = 1 if browser_manager and browser_manager.is_running() else 0
-    
+    if browser_manager and browser_manager.is_running():
+        browser_sessions = 1
+    else:
+        browser_sessions = 0
+
     response = MetricsResponse(
         requests_total=metrics["requests_total"],
         requests_success=metrics["requests_success"],
@@ -205,9 +208,9 @@ async def get_metrics():
         browser_sessions=browser_sessions,
         uptime=uptime,
     )
-    
+
     logger.debug("Metrics retrieved", **response.model_dump())
-    
+
     return response
 
 

@@ -2,8 +2,8 @@
 """
 API Security and Authentication.
 
-This module provides functions for API key validation and other security-related
-utilities.
+This module provides functions for API key validation and other
+security-related utilities.
 """
 
 from fastapi import HTTPException, Security
@@ -35,8 +35,10 @@ async def get_api_key(api_key: str = Security(api_key_header)) -> str:
     # The key is expected to be "Bearer <key>"
     parts = api_key.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(status_code=403, detail="Invalid authorization header format")
-    
+        raise HTTPException(
+            status_code=403, detail="Invalid authorization header format"
+        )
+
     token = parts[1]
 
     if token not in config.api.keys:

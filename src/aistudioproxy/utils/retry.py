@@ -49,7 +49,7 @@ def async_retry(
                             error=str(e),
                         )
                         raise
-                    
+
                     logger.warning(
                         "Attempt failed, retrying...",
                         func_name=func.__name__,
@@ -57,12 +57,14 @@ def async_retry(
                         delay=delay,
                         error=str(e),
                     )
-                    
+
                     # Apply jitter
                     jittered_delay = delay + random.uniform(-jitter, jitter) * delay
                     await asyncio.sleep(jittered_delay)
-                    
+
                     # Exponential backoff
                     delay = min(delay * factor, max_delay)
+
         return wrapper
+
     return decorator
